@@ -1,11 +1,11 @@
 from datetime import datetime, date
 from flask import Blueprint, render_template
 from flask_login import login_required
-from app.extensions import db
 from app.models.menu import MenuItem, Category
 from app.models.tables import RestaurantTable, Reservation
 from app.models.inventory import InventoryItem
 from app.services.cache_service import cache
+from app.services.report_service import ReportService
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -50,10 +50,12 @@ def index():
     ).limit(5).all()
 
     tables_overview = RestaurantTable.query.order_by(RestaurantTable.table_number.asc()).limit(8).all()
+    chart_data = ReportService.get_dashboard_chart_data()
 
     return render_template(
         'dashboard/index.html',
         stats=stats,
         recent_reservations=recent_reservations,
-        tables_overview=tables_overview
+        tables_overview=tables_overview,
+        chart_data=chart_data
     )

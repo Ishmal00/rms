@@ -63,6 +63,8 @@
 (function () {
   'use strict';
 
+  $.fn.dataTable.ext.errMode = 'none';
+
   var currentCat      = '';
   var currentLowStock = false;
 
@@ -83,15 +85,16 @@
       }
     },
     columns: [
-      { data: 'sku',      render: function (v) { return '<code>' + v + '</code>'; } },
-      { data: 'name',     className: 'fw-semibold text-dark' },
-      { data: 'category', render: function (v) { return '<span class="badge bg-light text-secondary border">' + v + '</span>'; } },
-      { data: 'supplier', className: 'small' },
-      { data: 'current_stock', className: 'fw-bold' },
-      { data: 'minimum_stock', className: 'text-muted small' },
-      { data: 'reorder_quantity', className: 'text-muted small' },
-      { data: 'unit_cost' },
+      { data: 'sku', defaultContent: '', render: function (v) { return '<code>' + (v || '') + '</code>'; } },
+      { data: 'name', defaultContent: '', className: 'fw-semibold text-dark' },
+      { data: 'category', defaultContent: '', render: function (v) { return '<span class="badge bg-light text-secondary border">' + (v || '') + '</span>'; } },
+      { data: 'supplier', defaultContent: '', className: 'small' },
+      { data: 'current_stock', defaultContent: '', className: 'fw-bold' },
+      { data: 'minimum_stock', defaultContent: '', className: 'text-muted small' },
+      { data: 'reorder_quantity', defaultContent: '', className: 'text-muted small' },
+      { data: 'unit_cost', defaultContent: '' },
       { data: 'is_low_stock',
+        defaultContent: '',
         render: function (v) {
           return v
             ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="bi bi-arrow-down-circle me-1"></i>Low Stock</span>'

@@ -20,16 +20,38 @@ body {
 /* Sidebar Styling */
 #sidebar {
   width: var(--sidebar-width);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--sidebar-bg);
   position: fixed;
   top: 0;
   left: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 var(--sidebar-bg);
   z-index: 1000;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease-in-out;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+  background: var(--sidebar-bg);
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+  background-color: #475569;
+  border-radius: 999px;
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
 }
 
 .sidebar-brand {
@@ -187,10 +209,10 @@ body {
 
 @media (max-width: 992px) {
   #sidebar {
-    margin-left: calc(-1 * var(--sidebar-width));
+    transform: translateX(-100%);
   }
   #sidebar.show {
-    margin-left: 0;
+    transform: translateX(0);
   }
   #main-content {
     margin-left: 0;

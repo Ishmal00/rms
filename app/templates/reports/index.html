@@ -15,6 +15,26 @@
   </a>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="start_date">Start date</label>
+        <input class="form-control" id="start_date" name="start_date" type="date" value="{{ start_date }}" required>
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="end_date">End date</label>
+        <input class="form-control" id="end_date" name="end_date" type="date" value="{{ end_date }}" required>
+      </div>
+      <div class="col-sm-4 col-lg-2"><button class="btn btn-primary w-100" type="submit">Apply Range</button></div>
+      <div class="col-lg-4 d-flex gap-2">
+        <a class="btn btn-outline-success" href="{{ url_for('reports.export_csv', report_type='sales', start_date=start_date, end_date=end_date) }}">Export Sales CSV</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('reports.export_csv', report_type='expenses', start_date=start_date, end_date=end_date) }}">Export Expenses CSV</a>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Primary Financial KPI Cards -->
 <div class="row g-3 mb-4">
   <div class="col-md-4 col-lg-2">
@@ -64,6 +84,46 @@
         <h4 class="fw-bold mb-0 mt-1">${{ "%.2f"|format(kpis.avg_ticket) }}</h4>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Daily Sales vs Expenses</h6></div>
+      <div class="card-body"><canvas id="salesExpensesChart" aria-label="Daily sales compared to expenses"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Monthly Sales Summary</h6></div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light"><tr><th>Month</th><th class="text-end">Sales</th><th class="text-end">Expenses</th></tr></thead>
+          <tbody>
+            {% for row in sales_expenses.monthly %}
+            <tr><td>{{ row.month }}</td><td class="text-end">${{ "%.2f"|format(row.sales) }}</td><td class="text-end">${{ "%.2f"|format(row.expenses) }}</td></tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No monthly data for this range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Daily Sales and Expenses</h6></div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Date</th><th class="text-end">Sales</th><th class="text-end">Expenses</th></tr></thead>
+      <tbody>
+        {% for row in sales_expenses.daily %}
+        <tr><td>{{ row.date }}</td><td class="text-end">${{ "%.2f"|format(row.sales) }}</td><td class="text-end">${{ "%.2f"|format(row.expenses) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -144,4 +204,38 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  const reportDailyData = {{ sales_expenses.daily|tojson }};
+  new Chart(document.getElementById('salesExpensesChart'), {
+    type: 'line',
+    data: {
+      labels: reportDailyData.map((row) => row.date),
+      datasets: [
+        {
+          label: 'Sales',
+          data: reportDailyData.map((row) => row.sales),
+          borderColor: '#198754',
+          backgroundColor: '#198754',
+          tension: 0.25
+        },
+        {
+          label: 'Expenses',
+          data: reportDailyData.map((row) => row.expenses),
+          borderColor: '#dc3545',
+          backgroundColor: '#dc3545',
+          tension: 0.25
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+</script>
 {% endblock %}

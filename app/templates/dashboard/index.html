@@ -70,6 +70,41 @@
   </div>
 </div>
 
+<div class="row g-4 mb-4">
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-bold mb-0">Sales — Last 7 Days</h6>
+      </div>
+      <div class="card-body"><canvas id="salesLastSevenDays" aria-label="Sales for the last seven days"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-bold mb-0">Orders by Status</h6>
+      </div>
+      <div class="card-body"><canvas id="ordersByStatus" aria-label="Orders grouped by status"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-bold mb-0">Top 5 Selling Items</h6>
+      </div>
+      <div class="card-body"><canvas id="topSellingItems" aria-label="Top five selling items"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-bold mb-0">Revenue by Payment Method</h6>
+      </div>
+      <div class="card-body"><canvas id="revenueByPaymentMethod" aria-label="Revenue by payment method"></canvas></div>
+    </div>
+  </div>
+</div>
+
 <!-- Main Content Row -->
 <div class="row g-4">
   <!-- Floor Layout Overview -->
@@ -139,4 +174,80 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  const dashboardCharts = {{ chart_data|tojson }};
+  const chartConfigs = [
+    {
+      id: 'salesLastSevenDays',
+      type: 'line',
+      title: 'Revenue',
+      data: dashboardCharts.sales_last_7_days,
+      color: '#0d6efd',
+      money: true
+    },
+    {
+      id: 'ordersByStatus',
+      type: 'doughnut',
+      title: 'Orders',
+      data: dashboardCharts.orders_by_status,
+      color: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
+    },
+    {
+      id: 'topSellingItems',
+      type: 'bar',
+      title: 'Quantity Sold',
+      data: dashboardCharts.top_selling_items,
+      color: '#198754'
+    },
+    {
+      id: 'revenueByPaymentMethod',
+      type: 'bar',
+      title: 'Revenue',
+      data: dashboardCharts.revenue_by_payment_method,
+      color: '#6f42c1',
+      money: true
+    }
+  ];
+
+  chartConfigs.forEach((config) => {
+    const canvas = document.getElementById(config.id);
+    new Chart(canvas, {
+      type: config.type,
+      data: {
+        labels: config.data.labels,
+        datasets: [{
+          label: config.title,
+          data: config.data.values,
+          borderColor: config.color,
+          backgroundColor: config.color,
+          fill: config.type === 'line',
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: config.type === 'doughnut' },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const value = context.parsed.y ?? context.parsed;
+                return `${context.dataset.label}: ${config.money ? '$' : ''}${Number(value).toFixed(config.money ? 2 : 0)}`;
+              }
+            }
+          }
+        },
+        scales: config.type === 'doughnut' ? {} : {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  });
+</script>
 {% endblock %}

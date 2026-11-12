@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 import re
 from uuid import uuid4
@@ -11,8 +11,9 @@ from app import create_app
 from app.config import TestingConfig
 from app.extensions import db
 from app.models.auth import User
-from app.models.billing import PaymentMethod
+from app.models.billing import Invoice, Payment, PaymentMethod
 from app.models.customers import Customer
+from app.models.expenses import Expense, ExpenseCategory
 from app.models.inventory import InventoryItem
 from app.models.menu import MenuItem
 from app.models.notifications import Notification
@@ -24,6 +25,7 @@ from app.services.customer_service import CustomerService
 from app.services.employee_service import EmployeeService
 from app.services.notification_service import NotificationService
 from app.services.order_service import OrderPlacementError, OrderService
+from app.services.report_service import ReportService
 
 
 def create_test_app():
@@ -248,11 +250,66 @@ def test_admin_trash_restore_rejects_non_admin(app):
     assert client.post('/admin/restore/customer/1').status_code == 403
 
 
+def test_report_data_and_csv_exports(app):
+    admin = User.query.filter_by(username='admin').first()
+    invoice = Invoice.query.first()
+    payment_method = PaymentMethod.query.first()
+    category = ExpenseCategory.query.first()
+    token = uuid4().hex
+    amount = Decimal('43.21')
+    payment = Payment(
+        transaction_reference=f'REPORT-{token}',
+        invoice_id=invoice.id,
+        payment_method_id=payment_method.id,
+        amount=amount,
+        payment_status='completed',
+        payment_date=datetime.combine(date.today(), datetime.min.time()),
+        processed_by_user_id=admin.id
+    )
+    expense = Expense(
+        category_id=category.id,
+        title=f'Report expense {token}',
+        amount=amount,
+        expense_date=date.today(),
+        receipt_reference=f'RECEIPT-{token}'
+    )
+    db.session.add_all([payment, expense])
+    db.session.commit()
+
+    report = ReportService.get_sales_expense_report(
+        date.today(),
+        date.today(),
+        force_refresh=True
+    )
+    assert len(report['daily']) == 1
+    assert report['daily'][0]['sales'] >= float(amount)
+    assert report['daily'][0]['expenses'] >= float(amount)
+    assert report['monthly'][0]['month'] == date.today().strftime('%Y-%m')
+
+    dashboard_data = ReportService.get_dashboard_chart_data(force_refresh=True)
+    assert len(dashboard_data['sales_last_7_days']['labels']) == 7
+    assert len(dashboard_data['sales_last_7_days']['values']) == 7
+    assert len(dashboard_data['top_selling_items']['labels']) <= 5
+
+    client = app.test_client()
+    login_as(client, admin)
+    range_query = f'start_date={date.today().isoformat()}&end_date={date.today().isoformat()}'
+    sales_response = client.get(f'/reports/export/sales.csv?{range_query}')
+    assert sales_response.status_code == 200
+    assert sales_response.mimetype == 'text/csv'
+    assert f'REPORT-{token}'.encode() in sales_response.data
+    expense_response = client.get(f'/reports/export/expenses.csv?{range_query}')
+    assert expense_response.status_code == 200
+    assert f'Report expense {token}'.encode() in expense_response.data
+
+
 def test_step_4a_list_pages_render_for_admin(app):
     admin = User.query.filter_by(username='admin').first()
     client = app.test_client()
     login_as(client, admin)
     for path in (
+        '/',
+        '/reports/',
         '/customers/?q=Emily&status=active&page=1',
         '/staff/?q=EMP&status=active&page=1',
         '/expenses/?q=Electricity&category_id=1&status=active',

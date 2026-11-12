@@ -64,16 +64,16 @@ def inventory_api():
     def serialize_item(i):
         return {
             'id': i.id,
-            'sku': i.sku,
-            'name': i.name,
-            'category': i.category,
-            'current_stock': float(i.current_stock),
-            'minimum_stock': float(i.minimum_stock),
-            'reorder_quantity': float(i.reorder_quantity),
-            'unit': i.unit,
-            'unit_cost': f"${float(i.unit_cost):.2f}",
-            'is_low_stock': i.current_stock <= i.minimum_stock,
-            'supplier': i.supplier.name if i.supplier else '-'
+            'sku': i.sku or '',
+            'name': i.name or '',
+            'category': i.category or '',
+            'current_stock': float(i.current_stock or 0),
+            'minimum_stock': float(i.minimum_stock or 0),
+            'reorder_quantity': float(i.reorder_quantity or 0),
+            'unit': i.unit or '',
+            'unit_cost': f"${float(i.unit_cost or 0):.2f}",
+            'is_low_stock': (i.current_stock or 0) <= (i.minimum_stock or 0),
+            'supplier': (i.supplier.name or '') if i.supplier else ''
         }
 
     res = paginate_query(
