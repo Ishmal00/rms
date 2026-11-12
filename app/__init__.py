@@ -13,7 +13,13 @@ def create_app(config_name=None):
         config_name = os.environ.get('FLASK_ENV', 'development')
 
     app = Flask(__name__)
-    app.config.from_object(config.get(config_name, config['default']))
+    config_class = config.get(config_name, config['default'])
+    if config_name == 'production':
+        production_settings = config_class.from_environment()
+        app.config.from_object(config_class)
+        app.config.from_mapping(production_settings)
+    else:
+        app.config.from_object(config_class)
 
     # Initialize extensions
     db.init_app(app)
