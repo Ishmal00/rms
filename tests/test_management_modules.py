@@ -1,8 +1,10 @@
 from datetime import date
 from decimal import Decimal
+import re
 from uuid import uuid4
 
 import pytest
+from flask import g
 from sqlalchemy.engine import make_url
 
 from app import create_app
@@ -54,6 +56,7 @@ def login_as(client, user):
     with client.session_transaction() as session:
         session['_user_id'] = str(user.id)
         session['_fresh'] = True
+    g.pop('_login_user', None)
 
 
 def test_customer_routes_crud_search_and_detail(app):
@@ -141,6 +144,108 @@ def test_customer_status_toggle_is_permissioned_post_and_audited(app):
         target_id=customer.id,
         action='DEACTIVATE'
     ).count() == 1
+
+
+def test_admin_trash_restores_soft_deleted_model_types(app):
+    from app.models import (
+        Category,
+        CustomerFeedback,
+        DeliveryAgent,
+        Employee,
+        Expense,
+        InventoryItem,
+        MenuItem,
+        Notification,
+        RestaurantTable,
+        Reservation,
+        Supplier,
+    )
+
+    admin = User.query.filter_by(username='admin').first()
+    model_types = (
+        Customer,
+        Employee,
+        Expense,
+        CustomerFeedback,
+        DeliveryAgent,
+        Reservation,
+        Notification,
+        MenuItem,
+        Category,
+        InventoryItem,
+        Supplier,
+        RestaurantTable,
+    )
+    client = app.test_client()
+    login_as(client, admin)
+
+    for model in model_types:
+        record = model.query.filter_by(is_deleted=False).first()
+        assert record is not None, f'Expected seeded {model.__name__} record'
+        record.soft_delete(user_id=admin.id)
+        db.session.commit()
+
+        entity_type = {
+            'RestaurantTable': 'table',
+        }.get(model.__name__, re.sub(r'(?<!^)(?=[A-Z])', '_', model.__name__).lower())
+        response = client.post(f'/admin/restore/{entity_type}/{record.id}')
+        assert response.status_code == 302
+        db.session.expire_all()
+
+        restored = model.query_with_deleted().filter_by(id=record.id).first()
+        assert restored is not None
+        assert restored.is_deleted is False
+        assert restored.deleted_at is None
+        assert restored.deleted_by is None
+        assert restored.status == 'active'
+        assert AuditLog.query.filter_by(
+            action='RESTORE',
+            target_entity=model.__name__,
+            target_id=record.id
+        ).count() == 1
+
+
+def test_admin_trash_search_pagination_and_deleted_metadata(app):
+    admin = User.query.filter_by(username='admin').first()
+    token = uuid4().hex[:8]
+    customers = [
+        Customer(
+            name=f'Trash Search {token} {index:02d}',
+            phone=f'+1-555-{uuid4().hex[:8]}',
+            email=f'trash-{token}-{index}@example.test'
+        )
+        for index in range(21)
+    ]
+    db.session.add_all(customers)
+    db.session.flush()
+    for customer in customers:
+        customer.soft_delete(user_id=admin.id)
+    db.session.commit()
+
+    client = app.test_client()
+    login_as(client, admin)
+    response = client.get(
+        f'/admin/trash?q={token}&entity_type=customer&page=2'
+    )
+    assert response.status_code == 200
+    assert b'Showing 21 matching deleted record(s).' in response.data
+    assert f'Trash Search {token} 20'.encode() in response.data
+    assert f'Trash Search {token} 00'.encode() not in response.data
+    assert b'System Administrator' in response.data
+    assert b'Deleted At' in response.data
+
+
+def test_admin_trash_restore_rejects_non_admin(app):
+    waiter = User.query.filter_by(username='waiter').first()
+    assert waiter.role.slug == 'waiter'
+    assert not waiter.has_role('admin')
+    client = app.test_client()
+    login_as(client, waiter)
+    with client.session_transaction() as session:
+        assert session['_user_id'] == str(waiter.id)
+
+    assert client.get('/admin/trash').status_code == 403
+    assert client.post('/admin/restore/customer/1').status_code == 403
 
 
 def test_step_4a_list_pages_render_for_admin(app):

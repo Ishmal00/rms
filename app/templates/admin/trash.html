@@ -4,199 +4,93 @@
 
 {% block content %}
 <div class="card border-0 shadow-sm rounded-4">
-  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h5 class="fw-bold mb-1"><i class="bi bi-trash3 text-danger me-2"></i>Soft-Deleted Records</h5>
-        <p class="text-muted small mb-0">Records hidden by default filters can be reviewed and restored here.</p>
+  <div class="card-header bg-transparent border-0 pt-4 px-4">
+    <h5 class="fw-bold mb-1"><i class="bi bi-trash3 text-danger me-2"></i>Soft-Deleted Records</h5>
+    <p class="text-muted small mb-3">Review and restore records grouped by entity type.</p>
+    <form method="GET" class="row g-2">
+      <div class="col-md-6">
+        <input class="form-control" type="search" name="q" value="{{ search }}" placeholder="Search deleted records">
       </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <ul class="nav nav-tabs border-bottom-0 mt-4" id="trashTabs" role="tablist">
-      <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#menuTrash" type="button">
-          Menu Items ({{ menu_items|length }})
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tablesTrash" type="button">
-          Tables ({{ tables|length }})
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#inventoryTrash" type="button">
-          Inventory ({{ inventory_items|length }})
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#categoriesTrash" type="button">
-          Categories ({{ categories|length }})
-        </button>
-      </li>
-    </ul>
+      <div class="col-md-4">
+        <select class="form-select" name="entity_type">
+          <option value="">All entity types</option>
+          {% for entity_type, entity_label in entity_options %}
+          <option value="{{ entity_type }}" {{ 'selected' if selected_entity == entity_type }}>
+            {{ entity_label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search</button></div>
+    </form>
   </div>
 
   <div class="card-body p-4">
-    <div class="tab-content" id="trashTabsContent">
-      <!-- Menu Items Tab -->
-      <div class="tab-pane fade show active" id="menuTrash">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th>
-                <th>Item Name</th>
-                <th>Category</th>
-                <th>Deleted At</th>
-                <th>Deleted By</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in menu_items %}
-                <tr>
-                  <td>#{{ item.id }}</td>
-                  <td class="fw-semibold">{{ item.name }}</td>
-                  <td>{{ item.category.name if item.category else '-' }}</td>
-                  <td class="small text-muted">{{ item.deleted_at.strftime('%Y-%m-%d %H:%M') if item.deleted_at else '-' }}</td>
-                  <td>{{ item.deleted_by or 'System' }}</td>
-                  <td class="text-end">
-                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='menu_item', item_id=item.id) }}" class="d-inline">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              {% else %}
-                <tr>
-                  <td colspan="6" class="text-center py-4 text-muted">Trash is empty. No deleted menu items.</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+    {% if pagination %}
+      <p class="small text-muted">Showing {{ pagination.total }} matching deleted record(s).</p>
+    {% endif %}
+    {% for entity_label, records in grouped_trash.items() %}
+    <section class="mb-4">
+      <h6 class="fw-bold border-bottom pb-2">{{ entity_label }} <span class="badge bg-secondary">{{ records|length }}</span></h6>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th>
+              <th>Record</th>
+              <th>Deleted At</th>
+              <th>Deleted By</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in records %}
+            <tr>
+              <td>#{{ record.id }}</td>
+              <td class="fw-semibold">{{ record.name }}</td>
+              <td class="small text-muted">{{ record.deleted_at.strftime('%Y-%m-%d %H:%M') if record.deleted_at else '-' }}</td>
+              <td>
+                {% if record.deleted_by %}
+                  {{ record.deleted_by.full_name or record.deleted_by.username }}
+                {% elif record.deleted_by_id %}
+                  User #{{ record.deleted_by_id }}
+                {% else %}
+                  System
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <form method="POST" action="{{ url_for('admin.restore_item', entity_type=record.entity_type, item_id=record.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+    </section>
+    {% else %}
+    <div class="text-center py-5 text-muted">No deleted records match your search.</div>
+    {% endfor %}
 
-      <!-- Tables Tab -->
-      <div class="tab-pane fade" id="tablesTrash">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th>
-                <th>Table Number</th>
-                <th>Zone</th>
-                <th>Deleted At</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for tbl in tables %}
-                <tr>
-                  <td>#{{ tbl.id }}</td>
-                  <td class="fw-semibold">{{ tbl.table_number }}</td>
-                  <td>{{ tbl.location_zone }}</td>
-                  <td class="small text-muted">{{ tbl.deleted_at.strftime('%Y-%m-%d %H:%M') if tbl.deleted_at else '-' }}</td>
-                  <td class="text-end">
-                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='table', item_id=tbl.id) }}" class="d-inline">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              {% else %}
-                <tr>
-                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted tables.</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Inventory Tab -->
-      <div class="tab-pane fade" id="inventoryTrash">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th>
-                <th>SKU</th>
-                <th>Item Name</th>
-                <th>Deleted At</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for inv in inventory_items %}
-                <tr>
-                  <td>#{{ inv.id }}</td>
-                  <td><code>{{ inv.sku }}</code></td>
-                  <td class="fw-semibold">{{ inv.name }}</td>
-                  <td class="small text-muted">{{ inv.deleted_at.strftime('%Y-%m-%d %H:%M') if inv.deleted_at else '-' }}</td>
-                  <td class="text-end">
-                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='inventory_item', item_id=inv.id) }}" class="d-inline">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              {% else %}
-                <tr>
-                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted inventory items.</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Categories Tab -->
-      <div class="tab-pane fade" id="categoriesTrash">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th>
-                <th>Category Name</th>
-                <th>Slug</th>
-                <th>Deleted At</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for cat in categories %}
-                <tr>
-                  <td>#{{ cat.id }}</td>
-                  <td class="fw-semibold">{{ cat.name }}</td>
-                  <td><code>{{ cat.slug }}</code></td>
-                  <td class="small text-muted">{{ cat.deleted_at.strftime('%Y-%m-%d %H:%M') if cat.deleted_at else '-' }}</td>
-                  <td class="text-end">
-                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='category', item_id=cat.id) }}" class="d-inline">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              {% else %}
-                <tr>
-                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted categories.</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    {% if pagination and pagination.pages > 1 %}
+    <nav aria-label="Trash pages">
+      <ul class="pagination justify-content-center mb-0">
+        {% for page_number in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if page_number %}
+          <li class="page-item {{ 'active' if page_number == pagination.page }}">
+            <a class="page-link" href="{{ url_for('admin.trash', page=page_number, q=search, entity_type=selected_entity) }}">{{ page_number }}</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
