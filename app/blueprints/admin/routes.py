@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, flash, redirect, url_for
+from flask import Blueprint, render_template, flash, redirect, url_for, request
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.auth import User, Role
@@ -6,6 +6,7 @@ from app.models.menu import MenuItem, Category
 from app.models.tables import RestaurantTable
 from app.models.inventory import InventoryItem
 from app.utils.access_control import permission_required
+from app.services.status_service import StatusService, StatusServiceError
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -59,6 +60,47 @@ def restore_item(entity_type, item_id):
 @permission_required('auth.manage')
 def users():
     """Admin User & Role listing."""
-    all_users = User.query.order_by(User.id.asc()).all()
+    search = request.args.get('q', '', type=str).strip()
+    role_id = request.args.get('role_id', type=int)
+    status = request.args.get('status', '', type=str)
+    query = User.query.filter_by(is_deleted=False)
+    if search:
+        pattern = f'%{search}%'
+        query = query.filter(
+            User.username.ilike(pattern) | User.full_name.ilike(pattern) | User.email.ilike(pattern)
+        )
+    if role_id:
+        query = query.filter(User.role_id == role_id)
+    if status in ('active', 'deactive'):
+        query = query.filter(User.status == status)
+    pagination = query.order_by(User.id.asc()).paginate(
+        page=request.args.get('page', 1, type=int),
+        per_page=10,
+        error_out=False
+    )
     roles = Role.query.all()
-    return render_template('admin/users.html', users=all_users, roles=roles)
+    return render_template(
+        'admin/users.html',
+        users=pagination.items,
+        roles=roles,
+        pagination=pagination,
+        search=search,
+        selected_role=role_id,
+        selected_status=status
+    )
+
+
+@admin_bp.route('/users/<int:user_id>/toggle-status', methods=['POST'])
+@login_required
+@permission_required('auth.manage')
+def toggle_user_status(user_id):
+    user = User.query.filter_by(id=user_id, is_deleted=False).first_or_404()
+    if user.id == current_user.id:
+        flash('You cannot deactivate your own account.', 'danger')
+        return redirect(url_for('admin.users'))
+    try:
+        StatusService.toggle(user, current_user.id, entity_name='User')
+        flash(f'User status changed to {user.status}.', 'success')
+    except StatusServiceError as exc:
+        flash(str(exc), 'danger')
+    return redirect(request.referrer or url_for('admin.users'))

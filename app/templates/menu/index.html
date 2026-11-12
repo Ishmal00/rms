@@ -13,6 +13,11 @@
             <input type="hidden" name="category" value="{{ selected_category.slug }}">
           {% endif %}
           <input type="text" name="q" class="form-control" placeholder="Search dishes, drinks, keywords..." value="{{ search_query }}">
+          <select class="form-select" name="status">
+            <option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option>
+            <option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option>
+            <option value="all" {{ 'selected' if selected_status == 'all' }}>All</option>
+          </select>
           <button class="btn btn-outline-secondary" type="submit">
             <i class="bi bi-search"></i>
           </button>
@@ -30,9 +35,16 @@
           All Dishes
         </a>
         {% for cat in categories %}
-          <a href="{{ url_for('menu.index', category=cat.slug, q=search_query) }}" class="btn btn-sm {% if selected_category and selected_category.slug == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
-            {{ cat.name }}
-          </a>
+          <span class="d-inline-flex align-items-center gap-1">
+            <a href="{{ url_for('menu.index', category=cat.slug, q=search_query, status=selected_status) }}" class="btn btn-sm {% if selected_category and selected_category.slug == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+              {{ cat.name }}
+            </a>
+            <span class="badge {{ 'bg-success' if cat.status == 'active' else 'bg-secondary' }}">{{ cat.status|capitalize }}</span>
+            <form action="{{ url_for('menu.toggle_category_status', category_id=cat.id) }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-warning" type="submit" title="Toggle category status">{{ 'Deactivate' if cat.status == 'active' else 'Activate' }}</button>
+            </form>
+          </span>
         {% endfor %}
       </div>
     </div>
@@ -67,6 +79,11 @@
                   <span class="badge bg-light text-muted border">
                     <i class="bi bi-clock"></i> {{ item.prep_time_minutes }}m
                   </span>
+                  <span class="badge {{ 'bg-success' if item.status == 'active' else 'bg-secondary' }}">{{ item.status|capitalize }}</span>
+                  <form action="{{ url_for('menu.toggle_item_status', item_id=item.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if item.status == 'active' else 'Activate' }}</button>
+                  </form>
                 </div>
 
                 {% if item.variants %}
@@ -95,19 +112,19 @@
       <nav class="mt-4 d-flex justify-content-center">
         <ul class="pagination">
           <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('menu.index', page=pagination.prev_num, category=selected_category.slug if selected_category else None, q=search_query) }}">Previous</a>
+            <a class="page-link" href="{{ url_for('menu.index', page=pagination.prev_num, category=selected_category.slug if selected_category else None, q=search_query, status=selected_status) }}">Previous</a>
           </li>
           {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
             {% if p %}
               <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('menu.index', page=p, category=selected_category.slug if selected_category else None, q=search_query) }}">{{ p }}</a>
+                <a class="page-link" href="{{ url_for('menu.index', page=p, category=selected_category.slug if selected_category else None, q=search_query, status=selected_status) }}">{{ p }}</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
             {% endif %}
           {% endfor %}
           <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('menu.index', page=pagination.next_num, category=selected_category.slug if selected_category else None, q=search_query) }}">Next</a>
+            <a class="page-link" href="{{ url_for('menu.index', page=pagination.next_num, category=selected_category.slug if selected_category else None, q=search_query, status=selected_status) }}">Next</a>
           </li>
         </ul>
       </nav>

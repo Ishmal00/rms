@@ -54,6 +54,14 @@
       <i class="bi bi-pencil-square me-1"></i> Submit Customer Review
     </button>
   </div>
+  <div class="card-body border-bottom">
+    <form method="GET" class="row g-2">
+      <div class="col-md-6"><input class="form-control" name="q" value="{{ search }}" placeholder="Search customer, comments or response"></div>
+      <div class="col-md-2"><select class="form-select" name="rating"><option value="">All ratings</option>{% for r in range(5, 0, -1) %}<option value="{{ r }}" {{ 'selected' if selected_rating == r }}>{{ r }}+ stars</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select class="form-select" name="status"><option value="">All statuses</option><option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option></select></div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search / Filter</button></div>
+    </form>
+  </div>
   <div class="card-body p-0">
     <div class="list-group list-group-flush">
       {% for fb in feedbacks %}
@@ -61,6 +69,7 @@
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
             <span class="fw-bold fs-6">{{ fb.customer.name if fb.customer else 'Guest Customer' }}</span>
+            <span class="badge {{ 'bg-success' if fb.status == 'active' else 'bg-secondary' }}">{{ fb.status|capitalize }}</span>
             {% if fb.order %}
               <span class="badge bg-light text-dark border ms-2">Order #{{ fb.order.order_number }}</span>
             {% endif %}
@@ -72,6 +81,10 @@
           </div>
           <small class="text-muted">{{ fb.created_at.strftime('%b %d, %Y') }}</small>
         </div>
+        <form action="{{ url_for('feedback.toggle_status', feedback_id=fb.id) }}" method="POST" class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if fb.status == 'active' else 'Activate' }}</button>
+        </form>
 
         <div class="row g-2 mb-2 text-muted small">
           <div class="col-auto">Food: <strong>{{ fb.food_rating }}/5</strong></div>
@@ -103,6 +116,13 @@
                 </div>
               </form>
             </div>
+            {% if pagination.pages > 1 %}
+            <div class="card-footer bg-white"><nav><ul class="pagination justify-content-end mb-0">
+              {% for p in pagination.iter_pages() %}{% if p %}
+              <li class="page-item {{ 'active' if p == pagination.page }}"><a class="page-link" href="{{ url_for('feedback.index', page=p, q=search, rating=selected_rating, status=selected_status) }}">{{ p }}</a></li>
+              {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+            </ul></nav></div>
+            {% endif %}
           </div>
         {% endif %}
       </div>

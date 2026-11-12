@@ -14,7 +14,7 @@ class LoyaltyService:
     def get_customer_tier(customer):
         """Returns the customer's current loyalty tier based on accrued points/spend."""
         points = customer.loyalty_points or 0
-        tiers = LoyaltyProgram.query.order_by(LoyaltyProgram.min_spend.desc()).all()
+        tiers = LoyaltyProgram.query.filter_by(status='active').order_by(LoyaltyProgram.min_spend.desc()).all()
         for tier in tiers:
             # 10 points per dollar equivalent
             if Decimal(str(points)) >= (tier.min_spend * Decimal('10')):

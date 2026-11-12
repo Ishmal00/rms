@@ -4,6 +4,13 @@
 {% block page_title %}Notifications{% endblock %}
 
 {% block content %}
+<form method="GET" class="row g-2 mb-3">
+  <div class="col-md-5"><input class="form-control" name="q" value="{{ search }}" placeholder="Search title or message"></div>
+  <div class="col-md-2"><select class="form-select" name="type"><option value="">All types</option>{% for type in types %}<option value="{{ type }}" {{ 'selected' if selected_type == type }}>{{ type|replace('_', ' ')|title }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select" name="read"><option value="">Read + unread</option><option value="unread" {{ 'selected' if selected_read == 'unread' }}>Unread</option><option value="read" {{ 'selected' if selected_read == 'read' }}>Read</option></select></div>
+  <div class="col-md-2"><select class="form-select" name="status"><option value="">All statuses</option><option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option></select></div>
+  <div class="col-md-1"><button class="btn btn-outline-primary w-100" type="submit"><i class="bi bi-search"></i></button></div>
+</form>
 <div class="card border-0 shadow-sm">
   <div class="list-group list-group-flush">
     {% for notification in notifications %}
@@ -12,6 +19,7 @@
         <div>
           <div class="fw-semibold">{{ notification.title }}</div>
           <div>{{ notification.message }}</div>
+          <span class="badge {{ 'bg-success' if notification.status == 'active' else 'bg-secondary' }}">{{ notification.status|capitalize }}</span>
           <small class="text-muted">{{ notification.created_at.strftime('%b %d, %Y %H:%M') }}</small>
           {% if notification.link %}
           <div><a href="{{ notification.link }}" class="small">Open related page</a></div>
@@ -25,7 +33,18 @@
         {% else %}
         <span class="badge bg-secondary">Read</span>
         {% endif %}
+        <form method="POST" action="{{ url_for('notifications.toggle_status', notification_id=notification.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if notification.status == 'active' else 'Activate' }}</button>
+        </form>
       </div>
+      {% if pagination.pages > 1 %}
+      <div class="card-footer bg-white"><nav><ul class="pagination justify-content-end mb-0">
+        {% for p in pagination.iter_pages() %}{% if p %}
+        <li class="page-item {{ 'active' if p == pagination.page }}"><a class="page-link" href="{{ url_for('notifications.index', page=p, q=search, type=selected_type, read=selected_read, status=selected_status) }}">{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+      </ul></nav></div>
+      {% endif %}
     </div>
     {% else %}
     <div class="list-group-item text-center text-muted py-5">You have no notifications.</div>

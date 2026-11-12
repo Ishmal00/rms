@@ -6,6 +6,7 @@ from app.models.staff import Department, Employee, Shift, Attendance, Payroll
 from app.services.employee_service import EmployeeService
 from app.services.staff_service import StaffService, StaffServiceError
 from app.services.audit_service import AuditService
+from app.services.status_service import StatusService, StatusServiceError
 from app.utils.access_control import permission_required
 
 staff_bp = Blueprint('staff', __name__, url_prefix='/staff')
@@ -15,7 +16,29 @@ staff_bp = Blueprint('staff', __name__, url_prefix='/staff')
 @login_required
 @permission_required('staff.manage')
 def index():
-    employees = Employee.query.order_by(Employee.employee_code).all()
+    search = request.args.get('q', '', type=str).strip()
+    department_id = request.args.get('department_id', type=int)
+    status = request.args.get('status', '', type=str)
+    query = Employee.query.filter_by(is_deleted=False)
+    if search:
+        pattern = f'%{search}%'
+        query = query.filter(
+            Employee.employee_code.ilike(pattern)
+            | Employee.first_name.ilike(pattern)
+            | Employee.last_name.ilike(pattern)
+            | Employee.designation.ilike(pattern)
+        )
+    if department_id:
+        query = query.filter(Employee.department_id == department_id)
+    if status in ('active', 'deactive'):
+        query = query.filter(Employee.status == status)
+    pagination = query.order_by(Employee.employee_code).paginate(
+        page=request.args.get('page', 1, type=int),
+        per_page=10,
+        error_out=False
+    )
+    employees = pagination.items
+    employee_options = Employee.query.filter_by(status='active').order_by(Employee.employee_code).all()
     departments = Department.query.order_by(Department.name).all()
     shifts = Shift.query.order_by(Shift.name).all()
     today = date.today()
@@ -24,11 +47,30 @@ def index():
     return render_template(
         'staff/index.html',
         employees=employees,
+        employee_options=employee_options,
+        employee_total=pagination.total,
         departments=departments,
         shifts=shifts,
         today_attendances=today_attendances,
-        today=today
+        today=today,
+        employee_pagination=pagination,
+        employee_search=search,
+        employee_department_id=department_id,
+        employee_status=status
     )
+
+
+@staff_bp.route('/employees/<int:employee_id>/toggle-status', methods=['POST'])
+@login_required
+@permission_required('staff.manage')
+def employee_toggle_status(employee_id):
+    employee = Employee.query.filter_by(id=employee_id, is_deleted=False).first_or_404()
+    try:
+        StatusService.toggle(employee, current_user.id)
+        flash(f'Employee status changed to {employee.status}.', 'success')
+    except StatusServiceError as exc:
+        flash(str(exc), 'danger')
+    return redirect(request.referrer or url_for('staff.index'))
 
 
 @staff_bp.route('/employees/new', methods=['GET', 'POST'])

@@ -60,6 +60,11 @@ def seed_database():
         ('View Reports', 'reports.view', 'reports', 'View operational and financial reports'),
         ('Manage Staff', 'staff.manage', 'staff', 'View staff and manage attendance'),
         ('Manage Customers', 'customers.manage', 'customers', 'Create, update, and remove customer records'),
+        ('Manage Expenses', 'expenses.manage', 'expenses', 'View and manage expense records'),
+        ('Manage Feedback', 'feedback.manage', 'feedback', 'View and manage customer feedback'),
+        ('Manage Loyalty', 'loyalty.manage', 'loyalty', 'Manage loyalty tiers, rewards, and customer points'),
+        ('Manage Delivery', 'delivery.manage', 'delivery', 'Manage delivery dispatch and driver records'),
+        ('Manage Notifications', 'notifications.manage', 'notifications', 'View and manage in-app notifications'),
     ]
 
     perms = {}
@@ -79,7 +84,8 @@ def seed_database():
     manager_perms = [
         'menu.view', 'menu.manage', 'inventory.view', 'inventory.manage',
         'tables.view', 'tables.manage', 'reports.view', 'staff.manage',
-        'customers.manage'
+        'customers.manage', 'expenses.manage', 'feedback.manage',
+        'loyalty.manage', 'delivery.manage'
     ]
     for pslug in manager_perms:
         if not RolePermission.query.filter_by(role_id=roles['manager'].id, permission_id=perms[pslug].id).first():
@@ -104,6 +110,16 @@ def seed_database():
             role_id=roles['kitchen'].id,
             permission_id=perms['kitchen.view'].id
         ))
+
+    for role_slug in roles:
+        if not RolePermission.query.filter_by(
+            role_id=roles[role_slug].id,
+            permission_id=perms['notifications.manage'].id
+        ).first():
+            db.session.add(RolePermission(
+                role_id=roles[role_slug].id,
+                permission_id=perms['notifications.manage'].id
+            ))
 
     # ==========================================
     # 2. USERS

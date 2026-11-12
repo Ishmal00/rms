@@ -101,6 +101,71 @@ def test_customer_routes_crud_search_and_detail(app):
     assert AuditLog.query.filter_by(target_entity='Customer', target_id=customer.id).count() == 3
 
 
+def test_customer_search_and_filter_work_with_server_pagination(app):
+    admin = User.query.filter_by(username='admin').first()
+    token = uuid4().hex[:8]
+    customers = [
+        Customer(
+            name=f'Pagination {token} {index:02d}',
+            phone=f'+1-555-{uuid4().hex[:8]}',
+            email=f'{token}-{index}@example.test',
+            status='active'
+        )
+        for index in range(11)
+    ]
+    db.session.add_all(customers)
+    db.session.commit()
+
+    client = app.test_client()
+    login_as(client, admin)
+    response = client.get(f'/customers/?q={token}&status=active&page=2')
+    assert response.status_code == 200
+    for customer in customers[:10]:
+        assert customer.name.encode() not in response.data
+    assert customers[10].name.encode() in response.data
+
+
+def test_customer_status_toggle_is_permissioned_post_and_audited(app):
+    admin = User.query.filter_by(username='admin').first()
+    customer = Customer.query.filter_by(name='Emily Watson').first()
+    client = app.test_client()
+    login_as(client, admin)
+
+    assert client.get(f'/customers/{customer.id}/toggle-status').status_code == 405
+    response = client.post(f'/customers/{customer.id}/toggle-status', follow_redirects=True)
+    assert response.status_code == 200
+    db.session.refresh(customer)
+    assert customer.status == 'deactive'
+    assert AuditLog.query.filter_by(
+        target_entity='Customer',
+        target_id=customer.id,
+        action='DEACTIVATE'
+    ).count() == 1
+
+
+def test_step_4a_list_pages_render_for_admin(app):
+    admin = User.query.filter_by(username='admin').first()
+    client = app.test_client()
+    login_as(client, admin)
+    for path in (
+        '/customers/?q=Emily&status=active&page=1',
+        '/staff/?q=EMP&status=active&page=1',
+        '/expenses/?q=Electricity&category_id=1&status=active',
+        '/feedback/?q=world&rating=4&status=active&page=1',
+        '/loyalty/?q=Emily&status=active&transaction_type=earn&page=1',
+        '/delivery/?q=ORD&delivery_status=pending&status=active&page=1',
+        '/tables/?q=T&zone=Indoor&status=available&active_status=active&table_page=1',
+        '/tables/?reservation_q=Eleanor&reservation_status=confirmed&reservation_page=1',
+        '/menu/?q=Bruschetta&status=active&page=1',
+        '/notifications/?q=Welcome&type=system&read=unread&status=active&page=1',
+        '/admin/users?q=admin&status=active&page=1',
+        '/expenses/api/data?draw=1&start=0&length=10&search%5Bvalue%5D=Electricity&category_id=1&status=active',
+        '/menu/api/data?draw=1&start=0&length=10&search%5Bvalue%5D=Bruschetta'
+    ):
+        response = client.get(path)
+        assert response.status_code == 200, f'{path} returned {response.status_code}'
+
+
 def test_employee_routes_crud_department_designation_and_shift(app):
     admin = User.query.filter_by(username='admin').first()
     department = Department.query.first()

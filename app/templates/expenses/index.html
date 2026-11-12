@@ -81,7 +81,7 @@
       <!-- Category filter dropdown -->
       <div class="dropdown">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-          Category: <span id="expCatLabel">All</span>
+          Category: <span id="expCatLabel">{{ categories|selectattr('id', 'equalto', selected_category_id)|map(attribute='name')|first or 'All' }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><a class="dropdown-item exp-cat-item" href="#" data-cat="">All Categories</a></li>
@@ -90,6 +90,11 @@
           {% endfor %}
         </ul>
       </div>
+      <select class="form-select form-select-sm" id="expStatusFilter" style="width: 150px;">
+        <option value="">All statuses</option>
+        <option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option>
+        <option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option>
+      </select>
       <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#recordExpenseModal">
         <i class="bi bi-plus-circle me-1"></i> Record New Expense
       </button>
@@ -107,6 +112,8 @@
             <th>Receipt Ref</th>
             <th>Approved By</th>
             <th class="text-end">Amount</th>
+            <th>Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -185,11 +192,13 @@
 (function () {
   'use strict';
 
-  var currentCat = '';
+  var currentCat = '{{ selected_category_id or "" }}';
+  var currentStatus = '{{ selected_status }}';
 
   var table = $('#expensesTable').DataTable({
     processing: true,
     serverSide: true,
+    search: { search: {{ search|tojson }} },
     pageLength: 25,
     lengthMenu: [10, 25, 50, 100],
     order: [[0, 'desc']],
@@ -198,6 +207,7 @@
       type: 'GET',
       data: function (d) {
         d.category_id = currentCat;
+        d.status = currentStatus;
       },
       error: function (xhr, error, thrown) {
         console.error('DataTables AJAX error:', error, thrown);
@@ -215,7 +225,9 @@
       { data: 'payment_method', className: 'small' },
       { data: 'receipt_reference', render: function (v) { return '<code class="text-secondary">' + (v || '-') + '</code>'; } },
       { data: 'approved_by', className: 'small text-muted' },
-      { data: 'amount', className: 'text-end fw-bold text-danger fs-6' }
+      { data: 'amount', className: 'text-end fw-bold text-danger fs-6' },
+      { data: 'status', render: function (v) { return '<span class="badge ' + (v === 'active' ? 'bg-success' : 'bg-secondary') + '">' + v + '</span>'; } },
+      { data: 'status_toggle', orderable: false, searchable: false }
     ],
     language: {
       emptyTable:  '<div class="text-center py-4 text-muted">No expense records found.</div>',
@@ -237,6 +249,11 @@
     e.preventDefault();
     currentCat = $(this).data('cat');
     $('#expCatLabel').text($(this).text());
+    table.ajax.reload();
+  });
+
+  $('#expStatusFilter').on('change', function () {
+    currentStatus = $(this).val();
     table.ajax.reload();
   });
 

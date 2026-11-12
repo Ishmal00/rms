@@ -8,11 +8,11 @@
     <!-- Filters Header -->
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
       <div class="d-flex flex-wrap gap-2">
-        <a href="{{ url_for('tables.index', status=selected_status) }}" class="btn btn-sm {% if not selected_zone %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+        <a href="{{ url_for('tables.index', status=selected_status, active_status=active_status, q=search) }}" class="btn btn-sm {% if not selected_zone %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
           All Zones
         </a>
         {% for z in zones %}
-          <a href="{{ url_for('tables.index', zone=z, status=selected_status) }}" class="btn btn-sm {% if selected_zone == z %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+          <a href="{{ url_for('tables.index', zone=z, status=selected_status, active_status=active_status, q=search) }}" class="btn btn-sm {% if selected_zone == z %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
             {{ z }}
           </a>
         {% endfor %}
@@ -27,6 +27,19 @@
           <a href="{{ url_for('tables.index', zone=selected_zone, status='reserved') }}" class="btn {% if selected_status == 'reserved' %}btn-warning{% else %}btn-outline-warning{% endif %}">Reserved</a>
         </div>
       </div>
+      <form method="GET" class="row g-2 mb-4">
+        <div class="col-md-5"><input class="form-control" name="q" value="{{ search }}" placeholder="Search table or zone"></div>
+        <div class="col-md-3">
+          <select class="form-select" name="active_status">
+            <option value="">All record statuses</option>
+            <option value="active" {{ 'selected' if active_status == 'active' }}>Active</option>
+            <option value="deactive" {{ 'selected' if active_status == 'deactive' }}>Deactive</option>
+          </select>
+        </div>
+        <input type="hidden" name="zone" value="{{ selected_zone }}">
+        <input type="hidden" name="status" value="{{ selected_status }}">
+        <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search</button></div>
+      </form>
     </div>
 
     <!-- Tables Grid -->
@@ -39,6 +52,7 @@
               <span class="badge {% if table.table_status == 'available' %}bg-success{% elif table.table_status == 'occupied' %}bg-danger{% elif table.table_status == 'reserved' %}bg-warning text-dark{% else %}bg-secondary{% endif %} text-capitalize">
                 {{ table.table_status }}
               </span>
+              <span class="badge {{ 'bg-success' if table.status == 'active' else 'bg-secondary' }}">{{ table.status|capitalize }}</span>
             </div>
             <div class="text-center my-3">
               <h2 class="fw-bold mb-0 text-dark">{{ table.table_number }}</h2>
@@ -48,7 +62,10 @@
             </div>
             <div class="d-flex justify-content-between align-items-center pt-2 border-top small text-muted">
               <span>Token: <code>{{ table.qr_code_token or 'N/A' }}</code></span>
-              <i class="bi bi-qr-code text-primary fs-5" title="QR Token Available"></i>
+              <form action="{{ url_for('tables.toggle_table_status', table_id=table.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if table.status == 'active' else 'Activate' }}</button>
+              </form>
             </div>
           </div>
         </div>
@@ -58,10 +75,23 @@
         </div>
       {% endfor %}
     </div>
+    {% if table_pagination.pages > 1 %}
+    <nav><ul class="pagination justify-content-center">
+      {% for p in table_pagination.iter_pages() %}{% if p %}
+      <li class="page-item {{ 'active' if p == table_pagination.page }}"><a class="page-link" href="{{ url_for('tables.index', table_page=p, q=search, zone=selected_zone, status=selected_status, active_status=active_status, reservation_q=reservation_search, reservation_status=reservation_status) }}">{{ p }}</a></li>
+      {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+    </ul></nav>
+    {% endif %}
 
     <!-- Reservations Section -->
     <div class="pt-4 border-top">
       <h5 class="fw-bold mb-3"><i class="bi bi-calendar-event me-2 text-primary"></i>Customer Reservations</h5>
+      <form method="GET" class="row g-2 mb-3">
+        <div class="col-md-6"><input class="form-control" name="reservation_q" value="{{ reservation_search }}" placeholder="Search reservation customer, phone, email"></div>
+        <div class="col-md-2"><select class="form-select" name="reservation_status"><option value="">All booking statuses</option>{% for s in ['pending', 'confirmed', 'seated', 'cancelled', 'completed'] %}<option value="{{ s }}" {{ 'selected' if reservation_status == s }}>{{ s|capitalize }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><select class="form-select" name="reservation_record_status"><option value="">All record statuses</option><option value="active" {{ 'selected' if reservation_record_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if reservation_record_status == 'deactive' }}>Deactive</option></select></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search</button></div>
+      </form>
       <div class="table-responsive">
         <table class="table table-hover align-middle">
           <thead class="table-light">
@@ -72,7 +102,9 @@
               <th>Guests</th>
               <th>Date & Time</th>
               <th>Status</th>
+              <th>Record Status</th>
               <th>Special Requests</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -94,12 +126,21 @@
                     {{ res.reservation_status }}
                   </span>
                 </td>
+                <td><span class="badge {{ 'bg-success' if res.status == 'active' else 'bg-secondary' }}">{{ res.status|capitalize }}</span></td>
                 <td class="small text-muted">{{ res.special_requests or '-' }}</td>
+                <td><form action="{{ url_for('tables.toggle_reservation_status', reservation_id=res.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if res.status == 'active' else 'Activate' }}</button></form></td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+      {% if reservation_pagination.pages > 1 %}
+      <nav class="mt-2"><ul class="pagination justify-content-end">
+        {% for p in reservation_pagination.iter_pages() %}{% if p %}
+        <li class="page-item {{ 'active' if p == reservation_pagination.page }}"><a class="page-link" href="{{ url_for('tables.index', reservation_page=p, reservation_q=reservation_search, reservation_status=reservation_status, reservation_record_status=reservation_record_status, q=search, zone=selected_zone, status=selected_status, active_status=active_status) }}">{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+      </ul></nav>
+      {% endif %}
     </div>
   </div>
 </div>

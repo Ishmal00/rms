@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from app.models.customers import Customer
 from app.models.orders import Order
 from app.services.customer_service import CustomerService, CustomerServiceError
+from app.services.status_service import StatusService, StatusServiceError
 from app.utils.access_control import permission_required
 
 
@@ -15,6 +16,9 @@ customers_bp = Blueprint('customers', __name__, url_prefix='/customers')
 def index():
     search = request.args.get('q', '', type=str).strip()
     query = Customer.query.filter_by(is_deleted=False)
+    status = request.args.get('status', '', type=str)
+    if status in ('active', 'deactive'):
+        query = query.filter(Customer.status == status)
     if search:
         pattern = f'%{search}%'
         query = query.filter(
@@ -32,7 +36,8 @@ def index():
         'customers/index.html',
         customers=pagination.items,
         pagination=pagination,
-        search=search
+        search=search,
+        status=status
     )
 
 
@@ -88,3 +93,16 @@ def delete(customer_id):
     except CustomerServiceError as exc:
         flash(str(exc), 'danger')
     return redirect(url_for('customers.index'))
+
+
+@customers_bp.route('/<int:customer_id>/toggle-status', methods=['POST'])
+@login_required
+@permission_required('customers.manage')
+def toggle_status(customer_id):
+    customer = Customer.query.filter_by(id=customer_id, is_deleted=False).first_or_404()
+    try:
+        StatusService.toggle(customer, current_user.id)
+        flash(f'Customer status changed to {customer.status}.', 'success')
+    except StatusServiceError as exc:
+        flash(str(exc), 'danger')
+    return redirect(request.referrer or url_for('customers.index'))

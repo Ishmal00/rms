@@ -11,6 +11,12 @@
     </div>
   </div>
   <div class="card-body p-4">
+    <form method="GET" class="row g-2 mb-3">
+      <div class="col-md-5"><input class="form-control" name="q" value="{{ search }}" placeholder="Search name, username or email"></div>
+      <div class="col-md-3"><select class="form-select" name="role_id"><option value="">All roles</option>{% for role in roles %}<option value="{{ role.id }}" {{ 'selected' if selected_role == role.id }}>{{ role.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select class="form-select" name="status"><option value="">All statuses</option><option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option></select></div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search / Filter</button></div>
+    </form>
     <div class="table-responsive">
       <table class="table table-hover align-middle data-table">
         <thead class="table-light">
@@ -21,6 +27,7 @@
             <th>Status</th>
             <th>Last Active</th>
             <th>Created</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -57,11 +64,26 @@
               <td class="small text-muted">
                 {{ u.created_at.strftime('%Y-%m-%d') }}
               </td>
+              <td>
+                {% if u.id != current_user.id %}
+                <form action="{{ url_for('admin.toggle_user_status', user_id=u.id) }}" method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if u.status == 'active' else 'Activate' }}</button>
+                </form>
+                {% else %}<span class="text-muted small">Current user</span>{% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% if pagination.pages > 1 %}
+    <div class="card-footer bg-white"><nav><ul class="pagination justify-content-end mb-0">
+      {% for p in pagination.iter_pages() %}{% if p %}
+      <li class="page-item {{ 'active' if p == pagination.page }}"><a class="page-link" href="{{ url_for('admin.users', page=p, q=search, role_id=selected_role, status=selected_status) }}">{{ p }}</a></li>
+      {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+    </ul></nav></div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

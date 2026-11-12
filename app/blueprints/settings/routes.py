@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.settings import SystemSetting, AuditLog
 from app.services.audit_service import AuditService
+from app.services.cache_service import cache
 from app.utils.access_control import permission_required
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
@@ -36,5 +37,8 @@ def update_setting(setting_id):
 
     flash(f"Setting '{setting.setting_key}' updated successfully.", "success")
     AuditService.log('UPDATE_SETTING', 'SystemSetting', setting.id, f"Old: {old_val} -> New: {new_value}", user_id=current_user.id)
+    cache.delete_pattern('dashboard:*')
+    cache.delete_pattern('reports:*')
+    cache.delete_pattern('settings:*')
 
     return redirect(url_for('settings.index'))

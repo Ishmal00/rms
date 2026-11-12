@@ -7,6 +7,11 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <form method="GET" class="d-flex gap-2" role="search">
     <input class="form-control" type="search" name="q" value="{{ search }}" placeholder="Search name, email or phone">
+    <select class="form-select" name="status">
+      <option value="">All statuses</option>
+      <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
+      <option value="deactive" {{ 'selected' if status == 'deactive' }}>Deactive</option>
+    </select>
     <button class="btn btn-outline-primary" type="submit"><i class="bi bi-search"></i> Search</button>
   </form>
   <a class="btn btn-primary" href="{{ url_for('customers.create') }}"><i class="bi bi-person-plus me-1"></i> Add Customer</a>
@@ -16,7 +21,7 @@
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
-        <tr><th>Customer</th><th>Phone</th><th>Email</th><th>Loyalty Points</th><th class="text-end">Actions</th></tr>
+        <tr><th>Customer</th><th>Phone</th><th>Email</th><th>Loyalty Points</th><th>Status</th><th class="text-end">Actions</th></tr>
       </thead>
       <tbody>
         {% for customer in customers %}
@@ -25,9 +30,14 @@
           <td>{{ customer.phone }}</td>
           <td>{{ customer.email or '-' }}</td>
           <td><span class="badge bg-warning-subtle text-dark">{{ customer.loyalty_points }}</span></td>
+          <td><span class="badge {{ 'bg-success' if customer.status == 'active' else 'bg-secondary' }}">{{ customer.status|capitalize }}</span></td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('customers.detail', customer_id=customer.id) }}">View</a>
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.edit', customer_id=customer.id) }}">Edit</a>
+            <form method="POST" action="{{ url_for('customers.toggle_status', customer_id=customer.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if customer.status == 'active' else 'Activate' }}</button>
+            </form>
             <form method="POST" action="{{ url_for('customers.delete', customer_id=customer.id) }}" class="d-inline" onsubmit="return confirm('Move this customer to trash?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
@@ -35,7 +45,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No customers found.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">No customers found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -48,7 +58,7 @@
     {% for page in pagination.iter_pages() %}
       {% if page %}
       <li class="page-item {{ 'active' if page == pagination.page else '' }}">
-        <a class="page-link" href="{{ url_for('customers.index', page=page, q=search) }}">{{ page }}</a>
+        <a class="page-link" href="{{ url_for('customers.index', page=page, q=search, status=status) }}">{{ page }}</a>
       </li>
       {% else %}
       <li class="page-item disabled"><span class="page-link">…</span></li>

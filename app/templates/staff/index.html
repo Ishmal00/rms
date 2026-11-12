@@ -11,7 +11,7 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <div class="small text-white-50 text-uppercase fw-semibold">Total Staff</div>
-            <h3 class="fw-bold mb-0">{{ employees|length }}</h3>
+            <h3 class="fw-bold mb-0">{{ employee_total }}</h3>
           </div>
           <i class="bi bi-person-badge fs-1 text-white-50"></i>
         </div>
@@ -139,6 +139,25 @@
     <h6 class="mb-0 fw-bold"><i class="bi bi-people text-primary me-2"></i>Staff Directory</h6>
     <a class="btn btn-sm btn-primary" href="{{ url_for('staff.employee_create') }}"><i class="bi bi-person-plus me-1"></i> Add Employee</a>
   </div>
+  <div class="card-body border-bottom">
+    <form method="GET" action="{{ url_for('staff.index') }}" class="row g-2">
+      <div class="col-md-5"><input class="form-control" name="q" value="{{ employee_search }}" placeholder="Search employee code, name, designation"></div>
+      <div class="col-md-3">
+        <select class="form-select" name="department_id">
+          <option value="">All departments</option>
+          {% for department in departments %}<option value="{{ department.id }}" {{ 'selected' if employee_department_id == department.id }}>{{ department.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" name="status">
+          <option value="">All statuses</option>
+          <option value="active" {{ 'selected' if employee_status == 'active' }}>Active</option>
+          <option value="deactive" {{ 'selected' if employee_status == 'deactive' }}>Deactive</option>
+        </select>
+      </div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search / Filter</button></div>
+    </form>
+  </div>
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
@@ -151,11 +170,12 @@
             <th>Shift</th>
             <th>Base Salary</th>
             <th>Hire Date</th>
+            <th>Status</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {% for emp in employees %}
+          {% for emp in employee_options %}
           <tr>
             <td class="fw-bold">{{ emp.employee_code }}</td>
             <td>
@@ -167,8 +187,13 @@
             <td>{{ emp.shift.name if emp.shift else '-' }}</td>
             <td class="fw-semibold">${{ "%.2f"|format(emp.base_salary) }}</td>
             <td>{{ emp.hire_date.strftime('%b %d, %Y') if emp.hire_date else '-' }}</td>
+            <td><span class="badge {{ 'bg-success' if emp.status == 'active' else 'bg-secondary' }}">{{ emp.status|capitalize }}</span></td>
             <td>
               <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('staff.employee_edit', employee_id=emp.id) }}">Edit</a>
+              <form action="{{ url_for('staff.employee_toggle_status', employee_id=emp.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if emp.status == 'active' else 'Activate' }}</button>
+              </form>
               <form action="{{ url_for('staff.employee_delete', employee_id=emp.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Move this employee to trash?')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
@@ -176,11 +201,21 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-4">No active employees found.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-4">No active employees found.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% if employee_pagination.pages > 1 %}
+    <div class="card-footer bg-white">
+      <nav><ul class="pagination justify-content-end mb-0">
+        {% for page in employee_pagination.iter_pages() %}
+          {% if page %}<li class="page-item {{ 'active' if page == employee_pagination.page }}"><a class="page-link" href="{{ url_for('staff.index', page=page, q=employee_search, department_id=employee_department_id, status=employee_status) }}">{{ page }}</a></li>
+          {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        {% endfor %}
+      </ul></nav>
+    </div>
+    {% endif %}
   </div>
 </div>
 

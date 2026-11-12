@@ -4,6 +4,14 @@
 {% block page_title %}Customer Loyalty & Rewards Program{% endblock %}
 
 {% block content %}
+<form method="GET" class="row g-2 mb-4">
+  <div class="col-md-5"><input class="form-control" name="q" value="{{ search }}" placeholder="Search tiers, rewards, customers or transactions"></div>
+  <div class="col-md-2"><select class="form-select" name="status"><option value="">All statuses</option><option value="active" {{ 'selected' if selected_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if selected_status == 'deactive' }}>Deactive</option></select></div>
+  <div class="col-md-2"><select class="form-select" name="reward_type"><option value="">All reward types</option>{% for t in ['discount_voucher', 'free_item'] %}<option value="{{ t }}" {{ 'selected' if selected_reward_type == t }}>{{ t|replace('_', ' ')|title }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select" name="transaction_type"><option value="">All transactions</option>{% for t in ['earn', 'redeem', 'adjustment', 'expire'] %}<option value="{{ t }}" {{ 'selected' if selected_transaction_type == t }}>{{ t|capitalize }}</option>{% endfor %}</select></div>
+  <div class="col-md-1"><button class="btn btn-outline-primary w-100" type="submit"><i class="bi bi-search"></i></button></div>
+</form>
+
 <!-- Loyalty Tiers Cards -->
 <div class="row g-3 mb-4">
   {% for tier in tiers %}
@@ -12,6 +20,7 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h5 class="fw-bold mb-0">{{ tier.tier_name }}</h5>
+          <span class="badge {{ 'bg-success' if tier.status == 'active' else 'bg-secondary' }}">{{ tier.status|capitalize }}</span>
           <i class="bi bi-award fs-3 {% if tier.tier_name == 'Gold' %}text-warning{% elif tier.tier_name == 'Platinum' %}text-dark{% else %}text-secondary{% endif %}"></i>
         </div>
         <div class="small text-muted mb-2">Spend ${{ "%.0f"|format(tier.min_spend) }}+ to qualify</div>
@@ -26,18 +35,25 @@
           </div>
         </div>
         <p class="small text-muted mb-0">{{ tier.perks_description }}</p>
+        <form action="{{ url_for('loyalty.toggle_status', entity_type='tier', record_id=tier.id) }}" method="POST" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if tier.status == 'active' else 'Activate' }}</button>
+        </form>
       </div>
     </div>
   </div>
   {% endfor %}
 </div>
+{% if tier_pagination.pages > 1 %}
+<nav><ul class="pagination">{% for p in tier_pagination.iter_pages() %}{% if p %}<li class="page-item {{ 'active' if p == tier_pagination.page }}"><a class="page-link" href="{{ url_for('loyalty.index', tier_page=p, q=search, status=selected_status, reward_type=selected_reward_type, transaction_type=selected_transaction_type) }}">{{ p }}</a></li>{% endif %}{% endfor %}</ul></nav>
+{% endif %}
 
 <div class="row g-4 mb-4">
   <!-- Rewards Catalog -->
   <div class="col-lg-5">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-header bg-white py-3">
-        <h6 class="mb-0 fw-bold"><i class="bi bi-gift text-primary me-2"></i>Active Rewards Catalog</h6>
+        <h6 class="mb-0 fw-bold"><i class="bi bi-gift text-primary me-2"></i>Rewards Catalog</h6>
       </div>
       <div class="card-body p-0">
         <ul class="list-group list-group-flush">
@@ -50,12 +66,20 @@
             </div>
             <div>
               <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill">{{ r.points_required }} pts</span>
+              <span class="badge {{ 'bg-success' if r.status == 'active' else 'bg-secondary' }}">{{ r.status|capitalize }}</span>
+              <form action="{{ url_for('loyalty.toggle_status', entity_type='reward', record_id=r.id) }}" method="POST" class="mt-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if r.status == 'active' else 'Activate' }}</button>
+              </form>
             </div>
           </li>
           {% else %}
           <li class="list-group-item text-center text-muted py-4">No rewards active.</li>
           {% endfor %}
         </ul>
+        {% if reward_pagination.pages > 1 %}
+        <nav class="p-2"><ul class="pagination mb-0">{% for p in reward_pagination.iter_pages() %}{% if p %}<li class="page-item {{ 'active' if p == reward_pagination.page }}"><a class="page-link" href="{{ url_for('loyalty.index', reward_page=p, q=search, status=selected_status, reward_type=selected_reward_type, transaction_type=selected_transaction_type) }}">{{ p }}</a></li>{% endif %}{% endfor %}</ul></nav>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -80,6 +104,8 @@
                 <th>Phone</th>
                 <th>Points Balance</th>
                 <th>Tier</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -92,6 +118,8 @@
                     {{ cust.loyalty_points or 0 }} pts
                   </span>
                 </td>
+                <td><span class="badge {{ 'bg-success' if cust.status == 'active' else 'bg-secondary' }}">{{ cust.status|capitalize }}</span></td>
+                <td><form action="{{ url_for('loyalty.toggle_status', entity_type='customer', record_id=cust.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if cust.status == 'active' else 'Activate' }}</button></form></td>
                 <td>
                   {% set pts = cust.loyalty_points or 0 %}
                   {% if pts >= 2500 %}
@@ -107,12 +135,15 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="4" class="text-center py-4 text-muted">No customers recorded yet.</td>
+                <td colspan="6" class="text-center py-4 text-muted">No customers recorded yet.</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% if customer_pagination.pages > 1 %}
+        <nav class="p-2"><ul class="pagination mb-0">{% for p in customer_pagination.iter_pages() %}{% if p %}<li class="page-item {{ 'active' if p == customer_pagination.page }}"><a class="page-link" href="{{ url_for('loyalty.index', customer_page=p, q=search, status=selected_status, reward_type=selected_reward_type, transaction_type=selected_transaction_type) }}">{{ p }}</a></li>{% endif %}{% endfor %}</ul></nav>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -134,6 +165,8 @@
             <th>Points</th>
             <th>Balance After</th>
             <th>Notes</th>
+            <th>Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -155,15 +188,20 @@
             </td>
             <td><span class="badge bg-light text-dark border">{{ tx.balance_after }} pts</span></td>
             <td><small class="text-muted">{{ tx.notes or '-' }}</small></td>
+            <td><span class="badge {{ 'bg-success' if tx.status == 'active' else 'bg-secondary' }}">{{ tx.status|capitalize }}</span></td>
+            <td><form action="{{ url_for('loyalty.toggle_status', entity_type='transaction', record_id=tx.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if tx.status == 'active' else 'Activate' }}</button></form></td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" class="text-center py-4 text-muted">No transactions recorded yet.</td>
+            <td colspan="8" class="text-center py-4 text-muted">No transactions recorded yet.</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% if transaction_pagination.pages > 1 %}
+    <nav class="p-2"><ul class="pagination mb-0">{% for p in transaction_pagination.iter_pages() %}{% if p %}<li class="page-item {{ 'active' if p == transaction_pagination.page }}"><a class="page-link" href="{{ url_for('loyalty.index', transaction_page=p, q=search, status=selected_status, reward_type=selected_reward_type, transaction_type=selected_transaction_type) }}">{{ p }}</a></li>{% endif %}{% endfor %}</ul></nav>
+    {% endif %}
   </div>
 </div>
 
@@ -182,7 +220,7 @@
             <label class="form-label fw-semibold">Customer</label>
             <select name="customer_id" class="form-select" required>
               <option value="">-- Select Customer --</option>
-              {% for cust in customers %}
+              {% for cust in redeem_customers %}
                 <option value="{{ cust.id }}">{{ cust.name }} ({{ cust.loyalty_points or 0 }} pts)</option>
               {% endfor %}
             </select>
@@ -191,7 +229,7 @@
             <label class="form-label fw-semibold">Reward Voucher</label>
             <select name="reward_id" class="form-select" required>
               <option value="">-- Choose Reward --</option>
-              {% for r in rewards %}
+              {% for r in redeem_rewards %}
                 <option value="{{ r.id }}">{{ r.title }} ({{ r.points_required }} pts - Value: ${{ r.reward_value }})</option>
               {% endfor %}
             </select>

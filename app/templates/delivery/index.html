@@ -12,6 +12,17 @@
         <h6 class="mb-0 fw-bold"><i class="bi bi-person-lines-fill text-primary me-2"></i>Delivery Fleet</h6>
         <span class="badge bg-primary rounded-pill">{{ agents|length }} Drivers</span>
       </div>
+      <form method="GET" class="p-3 border-bottom">
+        <div class="input-group">
+          <input class="form-control" name="agent_q" value="{{ agent_search }}" placeholder="Search driver name or phone">
+          <select class="form-select" name="agent_status">
+            <option value="">All statuses</option>
+            <option value="active" {{ 'selected' if agent_status == 'active' }}>Active</option>
+            <option value="deactive" {{ 'selected' if agent_status == 'deactive' }}>Deactive</option>
+          </select>
+          <button class="btn btn-outline-primary" type="submit">Filter drivers</button>
+        </div>
+      </form>
       <div class="card-body p-0">
         <ul class="list-group list-group-flush">
           {% for agent in agents %}
@@ -28,6 +39,11 @@
               {% else %}
                 <span class="badge bg-secondary">On Delivery</span>
               {% endif %}
+              <span class="badge {{ 'bg-success' if agent.status == 'active' else 'bg-secondary' }}">{{ agent.status|capitalize }}</span>
+              <form action="{{ url_for('delivery.toggle_agent_status', agent_id=agent.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if agent.status == 'active' else 'Activate' }}</button>
+              </form>
               <form action="{{ url_for('delivery.toggle_agent', agent_id=agent.id) }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-secondary" title="Toggle On/Off Duty">
@@ -41,6 +57,13 @@
           {% endfor %}
         </ul>
       </div>
+      {% if agent_pagination.pages > 1 %}
+      <div class="card-footer bg-white"><nav><ul class="pagination justify-content-end mb-0">
+        {% for p in agent_pagination.iter_pages() %}{% if p %}
+        <li class="page-item {{ 'active' if p == agent_pagination.page }}"><a class="page-link" href="{{ url_for('delivery.index', agent_page=p, agent_q=agent_search, agent_status=agent_status, q=search, delivery_status=delivery_status, status=record_status) }}">{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+      </ul></nav></div>
+      {% endif %}
     </div>
   </div>
 
@@ -54,6 +77,12 @@
         </div>
         <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">{{ active_deliveries|length }} Active</span>
       </div>
+      <form method="GET" class="p-3 border-bottom row g-2">
+        <div class="col-md-5"><input class="form-control" name="q" value="{{ search }}" placeholder="Search order, customer or notes"></div>
+        <div class="col-md-3"><select class="form-select" name="delivery_status"><option value="">All delivery stages</option>{% for s in ['pending', 'assigned', 'picked_up', 'in_transit', 'delivered', 'failed'] %}<option value="{{ s }}" {{ 'selected' if delivery_status == s }}>{{ s|replace('_', ' ')|title }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><select class="form-select" name="status"><option value="">All record statuses</option><option value="active" {{ 'selected' if record_status == 'active' }}>Active</option><option value="deactive" {{ 'selected' if record_status == 'deactive' }}>Deactive</option></select></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Search</button></div>
+      </form>
       <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
@@ -64,6 +93,7 @@
                 <th>Driver</th>
                 <th>Status</th>
                 <th>Fee</th>
+                <th>Record Status</th>
                 <th class="text-end">Dispatch Actions</th>
               </tr>
             </thead>
@@ -110,6 +140,7 @@
                   {% endif %}
                 </td>
                 <td>${{ "%.2f"|format(d.delivery_fee) }}</td>
+                <td><span class="badge {{ 'bg-success' if d.status == 'active' else 'bg-secondary' }}">{{ d.status|capitalize }}</span></td>
                 <td class="text-end">
                   {% if d.delivery_status == 'assigned' %}
                   <form action="{{ url_for('delivery.update_status', delivery_id=d.id) }}" method="POST" class="d-inline">
@@ -130,11 +161,15 @@
                     <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle me-1"></i> Delivered</button>
                   </form>
                   {% endif %}
+                  <form action="{{ url_for('delivery.toggle_delivery_status', delivery_id=d.id) }}" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if d.status == 'active' else 'Activate' }}</button>
+                  </form>
                 </td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="6" class="text-center py-4 text-muted">No active deliveries pending dispatch.</td>
+                <td colspan="7" class="text-center py-4 text-muted">No active deliveries pending dispatch.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -161,6 +196,8 @@
             <th>Delivered At</th>
             <th>Delivery Fee</th>
             <th>Status</th>
+            <th>Record Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -178,10 +215,17 @@
                 <span class="badge bg-danger">{{ d.delivery_status|capitalize }}</span>
               {% endif %}
             </td>
+            <td><span class="badge {{ 'bg-success' if d.status == 'active' else 'bg-secondary' }}">{{ d.status|capitalize }}</span></td>
+            <td>
+              <form action="{{ url_for('delivery.toggle_delivery_status', delivery_id=d.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Deactivate' if d.status == 'active' else 'Activate' }}</button>
+              </form>
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" class="text-center py-4 text-muted">No completed delivery history yet.</td>
+            <td colspan="8" class="text-center py-4 text-muted">No completed delivery history yet.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -189,4 +233,11 @@
     </div>
   </div>
 </div>
+{% if delivery_pagination.pages > 1 %}
+<nav class="mt-3"><ul class="pagination justify-content-end">
+  {% for p in delivery_pagination.iter_pages() %}{% if p %}
+  <li class="page-item {{ 'active' if p == delivery_pagination.page }}"><a class="page-link" href="{{ url_for('delivery.index', page=p, q=search, delivery_status=delivery_status, status=record_status, agent_q=agent_search, agent_status=agent_status) }}">{{ p }}</a></li>
+  {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+</ul></nav>
+{% endif %}
 {% endblock %}
