@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Menu Catalog{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-center justify-content-between mb-4">
+      <!-- Search Form -->
+      <div class="col-md-5">
+        <form method="GET" action="{{ url_for('menu.index') }}" class="input-group">
+          {% if selected_category %}
+            <input type="hidden" name="category" value="{{ selected_category.slug }}">
+          {% endif %}
+          <input type="text" name="q" class="form-control" placeholder="Search dishes, drinks, keywords..." value="{{ search_query }}">
+          <button class="btn btn-outline-secondary" type="submit">
+            <i class="bi bi-search"></i>
+          </button>
+          {% if search_query %}
+            <a href="{{ url_for('menu.index', category=selected_category.slug if selected_category else None) }}" class="btn btn-outline-danger" title="Clear Search">
+              <i class="bi bi-x"></i>
+            </a>
+          {% endif %}
+        </form>
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div class="col-md-7 d-flex flex-wrap gap-2 justify-content-md-end">
+        <a href="{{ url_for('menu.index', q=search_query) }}" class="btn btn-sm {% if not selected_category %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+          All Dishes
+        </a>
+        {% for cat in categories %}
+          <a href="{{ url_for('menu.index', category=cat.slug, q=search_query) }}" class="btn btn-sm {% if selected_category and selected_category.slug == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+            {{ cat.name }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Items Grid -->
+    <div class="row g-4">
+      {% for item in items %}
+        <div class="col-md-6 col-xl-3">
+          <div class="card h-100 border rounded-4 overflow-hidden shadow-sm">
+            <div class="card-body p-4 d-flex flex-direction-column flex-column justify-content-between">
+              <div>
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <span class="badge bg-light text-secondary border rounded-pill">{{ item.category.name }}</span>
+                  <div class="fs-5 fw-bold text-primary">${{ "%.2f"|format(item.base_price) }}</div>
+                </div>
+                <h5 class="fw-bold mb-1">{{ item.name }}</h5>
+                <p class="text-muted small mb-3">{{ item.description }}</p>
+              </div>
+
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  {% if item.is_vegetarian %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle" title="Vegetarian">
+                      <i class="bi bi-leaf"></i> Veg
+                    </span>
+                  {% endif %}
+                  {% if item.is_spicy %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="Spicy">
+                      <i class="bi bi-fire"></i> Spicy
+                    </span>
+                  {% endif %}
+                  <span class="badge bg-light text-muted border">
+                    <i class="bi bi-clock"></i> {{ item.prep_time_minutes }}m
+                  </span>
+                </div>
+
+                {% if item.variants %}
+                  <div class="small text-muted pt-2 border-top">
+                    <span class="fw-semibold">Portions:</span>
+                    {% for v in item.variants %}
+                      <span class="badge bg-light text-dark border me-1">{{ v.name }}{% if v.additional_price > 0 %} (+${{ "%.2f"|format(v.additional_price) }}){% endif %}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-12 text-center py-5">
+          <i class="bi bi-search fs-1 text-muted mb-2 d-block"></i>
+          <h5 class="text-secondary">No dishes match your criteria</h5>
+          <p class="text-muted small">Try selecting another category or resetting filters.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Bootstrap Pagination (Server-Side) -->
+    {% if pagination.pages > 1 %}
+      <nav class="mt-4 d-flex justify-content-center">
+        <ul class="pagination">
+          <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('menu.index', page=pagination.prev_num, category=selected_category.slug if selected_category else None, q=search_query) }}">Previous</a>
+          </li>
+          {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+            {% if p %}
+              <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('menu.index', page=p, category=selected_category.slug if selected_category else None, q=search_query) }}">{{ p }}</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+          {% endfor %}
+          <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('menu.index', page=pagination.next_num, category=selected_category.slug if selected_category else None, q=search_query) }}">Next</a>
+          </li>
+        </ul>
+      </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

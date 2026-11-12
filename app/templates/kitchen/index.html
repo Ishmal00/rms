@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Kitchen Display System (KDS){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="bi bi-fire text-danger me-2"></i>Live Kitchen Order Display</h4>
+    <span class="text-muted small">Auto-refreshing live ticket dispatch queue</span>
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <div class="form-check form-switch small">
+      <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+      <label class="form-check-label text-secondary" for="autoRefreshToggle">
+        Auto-refresh (10s) <span class="badge bg-light text-dark border ms-1" id="refreshTimer">10s</span>
+      </label>
+    </div>
+    <a href="{{ url_for('kitchen.index') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-clockwise"></i> Refresh Now
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Column 1: Pending Tickets -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm rounded-4 bg-light">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-warning text-uppercase">
+          <i class="bi bi-hourglass-split me-1"></i> Pending Queue ({{ pending_tickets|length }})
+        </h6>
+      </div>
+      <div class="card-body p-3 overflow-auto" style="min-height: 580px; max-height: 750px;">
+        {% for ticket in pending_tickets %}
+          <div class="card border-warning border-2 rounded-3 p-3 mb-3 bg-white shadow-sm">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <span class="badge bg-warning text-dark fw-bold">{{ ticket.ticket_number }}</span>
+                <span class="small fw-semibold text-secondary ms-1">Order #{{ ticket.order.order_number if ticket.order else '' }}</span>
+              </div>
+              {% if ticket.order and ticket.order.table %}
+                <span class="badge bg-primary fs-6">{{ ticket.order.table.table_number }}</span>
+              {% elif ticket.order and ticket.order.order_type %}
+                <span class="badge bg-light text-dark border small">{{ ticket.order.order_type.name }}</span>
+              {% endif %}
+            </div>
+
+            <!-- Items List -->
+            <ul class="list-group list-group-flush small mb-3">
+              {% if ticket.order %}
+                {% for it in ticket.order.items %}
+                  <li class="list-group-item px-0 py-1 d-flex justify-content-between align-items-center">
+                    <div>
+                      <span class="fw-bold text-dark fs-6">{{ it.quantity }}x</span>
+                      <span class="fw-semibold text-dark">{{ it.menu_item.name if it.menu_item else '' }}</span>
+                      {% if it.variant %}
+                        <span class="badge bg-light text-secondary border small">{{ it.variant.name }}</span>
+                      {% endif %}
+                      {% if it.special_instructions %}
+                        <div class="text-danger small fst-italic ps-3">&bull; {{ it.special_instructions }}</div>
+                      {% endif %}
+                    </div>
+                  </li>
+                {% endfor %}
+              {% endif %}
+            </ul>
+
+            {% if ticket.notes %}
+              <div class="alert alert-warning py-1 px-2 small mb-3">
+                <i class="bi bi-info-circle me-1"></i> {{ ticket.notes }}
+              </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="small text-muted"><i class="bi bi-clock me-1"></i>{{ ticket.created_at.strftime('%H:%M:%S') }}</span>
+              <form method="POST" action="{{ url_for('kitchen.update_ticket_status', ticket_id=ticket.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="preparing">
+                <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold">
+                  <i class="bi bi-play-circle me-1"></i> Start Cooking
+                </button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small">No pending tickets.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 2: In Preparation -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm rounded-4 bg-light">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-info text-uppercase">
+          <i class="bi bi-fire me-1"></i> Cooking / Preparing ({{ preparing_tickets|length }})
+        </h6>
+      </div>
+      <div class="card-body p-3 overflow-auto" style="min-height: 580px; max-height: 750px;">
+        {% for ticket in preparing_tickets %}
+          <div class="card border-info border-2 rounded-3 p-3 mb-3 bg-white shadow-sm">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <span class="badge bg-info text-dark fw-bold">{{ ticket.ticket_number }}</span>
+                <span class="small fw-semibold text-secondary ms-1">Order #{{ ticket.order.order_number if ticket.order else '' }}</span>
+              </div>
+              {% if ticket.order and ticket.order.table %}
+                <span class="badge bg-primary fs-6">{{ ticket.order.table.table_number }}</span>
+              {% elif ticket.order and ticket.order.order_type %}
+                <span class="badge bg-light text-dark border small">{{ ticket.order.order_type.name }}</span>
+              {% endif %}
+            </div>
+
+            <ul class="list-group list-group-flush small mb-3">
+              {% if ticket.order %}
+                {% for it in ticket.order.items %}
+                  <li class="list-group-item px-0 py-1 d-flex justify-content-between align-items-center">
+                    <div>
+                      <span class="fw-bold text-dark fs-6">{{ it.quantity }}x</span>
+                      <span class="fw-semibold text-dark">{{ it.menu_item.name if it.menu_item else '' }}</span>
+                      {% if it.variant %}
+                        <span class="badge bg-light text-secondary border small">{{ it.variant.name }}</span>
+                      {% endif %}
+                      {% if it.special_instructions %}
+                        <div class="text-danger small fst-italic ps-3">&bull; {{ it.special_instructions }}</div>
+                      {% endif %}
+                    </div>
+                  </li>
+                {% endfor %}
+              {% endif %}
+            </ul>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="small text-muted">
+                Started: {{ ticket.prep_started_at.strftime('%H:%M:%S') if ticket.prep_started_at else '' }}
+              </span>
+              <form method="POST" action="{{ url_for('kitchen.update_ticket_status', ticket_id=ticket.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="ready">
+                <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                  <i class="bi bi-bell me-1"></i> Mark Ready
+                </button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small">No tickets currently in preparation.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 3: Ready to Serve -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm rounded-4 bg-light">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-success text-uppercase">
+          <i class="bi bi-check2-circle me-1"></i> Ready For Service ({{ ready_tickets|length }})
+        </h6>
+      </div>
+      <div class="card-body p-3 overflow-auto" style="min-height: 580px; max-height: 750px;">
+        {% for ticket in ready_tickets %}
+          <div class="card border-success border-2 rounded-3 p-3 mb-3 bg-white shadow-sm">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <span class="badge bg-success text-white fw-bold">{{ ticket.ticket_number }}</span>
+                <span class="small fw-semibold text-secondary ms-1">Order #{{ ticket.order.order_number if ticket.order else '' }}</span>
+              </div>
+              {% if ticket.order and ticket.order.table %}
+                <span class="badge bg-primary fs-6">{{ ticket.order.table.table_number }}</span>
+              {% elif ticket.order and ticket.order.order_type %}
+                <span class="badge bg-light text-dark border small">{{ ticket.order.order_type.name }}</span>
+              {% endif %}
+            </div>
+
+            <ul class="list-group list-group-flush small mb-3">
+              {% if ticket.order %}
+                {% for it in ticket.order.items %}
+                  <li class="list-group-item px-0 py-1">
+                    <span class="fw-bold text-dark fs-6">{{ it.quantity }}x</span>
+                    <span class="fw-semibold text-dark">{{ it.menu_item.name if it.menu_item else '' }}</span>
+                  </li>
+                {% endfor %}
+              {% endif %}
+            </ul>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="small text-muted">
+                Ready: {{ ticket.ready_at.strftime('%H:%M:%S') if ticket.ready_at else '' }}
+              </span>
+              <form method="POST" action="{{ url_for('kitchen.update_ticket_status', ticket_id=ticket.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="served">
+                <button type="submit" class="btn btn-sm btn-success fw-bold">
+                  <i class="bi bi-hand-thumbs-up me-1"></i> Served / Picked Up
+                </button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small">No tickets ready for pickup.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let countdown = 10;
+const timerDisplay = document.getElementById('refreshTimer');
+const toggle = document.getElementById('autoRefreshToggle');
+
+setInterval(function() {
+  if (toggle && toggle.checked) {
+    countdown -= 1;
+    if (timerDisplay) timerDisplay.textContent = `${countdown}s`;
+    if (countdown <= 0) {
+      window.location.reload();
+    }
+  }
+}, 1000);
+</script>
+{% endblock %}

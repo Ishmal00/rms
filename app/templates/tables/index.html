@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Floor Plan & Table Management{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <!-- Filters Header -->
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('tables.index', status=selected_status) }}" class="btn btn-sm {% if not selected_zone %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+          All Zones
+        </a>
+        {% for z in zones %}
+          <a href="{{ url_for('tables.index', zone=z, status=selected_status) }}" class="btn btn-sm {% if selected_zone == z %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+            {{ z }}
+          </a>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="small text-muted">Status:</span>
+        <div class="btn-group btn-group-sm">
+          <a href="{{ url_for('tables.index', zone=selected_zone) }}" class="btn {% if not selected_status %}btn-dark{% else %}btn-outline-secondary{% endif %}">All</a>
+          <a href="{{ url_for('tables.index', zone=selected_zone, status='available') }}" class="btn {% if selected_status == 'available' %}btn-success{% else %}btn-outline-success{% endif %}">Available</a>
+          <a href="{{ url_for('tables.index', zone=selected_zone, status='occupied') }}" class="btn {% if selected_status == 'occupied' %}btn-danger{% else %}btn-outline-danger{% endif %}">Occupied</a>
+          <a href="{{ url_for('tables.index', zone=selected_zone, status='reserved') }}" class="btn {% if selected_status == 'reserved' %}btn-warning{% else %}btn-outline-warning{% endif %}">Reserved</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables Grid -->
+    <div class="row g-3 mb-5">
+      {% for table in tables %}
+        <div class="col-sm-6 col-md-4 col-xl-3">
+          <div class="table-card {{ table.table_status }} p-4 position-relative">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="badge bg-white text-dark border fw-semibold">{{ table.location_zone }}</span>
+              <span class="badge {% if table.table_status == 'available' %}bg-success{% elif table.table_status == 'occupied' %}bg-danger{% elif table.table_status == 'reserved' %}bg-warning text-dark{% else %}bg-secondary{% endif %} text-capitalize">
+                {{ table.table_status }}
+              </span>
+            </div>
+            <div class="text-center my-3">
+              <h2 class="fw-bold mb-0 text-dark">{{ table.table_number }}</h2>
+              <div class="text-secondary small mt-1">
+                <i class="bi bi-people-fill me-1"></i> Capacity: <strong>{{ table.capacity }}</strong> guests
+              </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top small text-muted">
+              <span>Token: <code>{{ table.qr_code_token or 'N/A' }}</code></span>
+              <i class="bi bi-qr-code text-primary fs-5" title="QR Token Available"></i>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-12 text-center py-5">
+          <p class="text-muted">No tables match the current filter.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Reservations Section -->
+    <div class="pt-4 border-top">
+      <h5 class="fw-bold mb-3"><i class="bi bi-calendar-event me-2 text-primary"></i>Customer Reservations</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>Table</th>
+              <th>Guests</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th>Special Requests</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for res in reservations %}
+              <tr>
+                <td class="fw-semibold text-dark">{{ res.customer_name }}</td>
+                <td>{{ res.customer_phone }}</td>
+                <td>
+                  {% if res.table %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ res.table.table_number }} ({{ res.table.location_zone }})</span>
+                  {% else %}
+                    <span class="text-muted">Unassigned</span>
+                  {% endif %}
+                </td>
+                <td>{{ res.guest_count }} people</td>
+                <td>{{ res.reservation_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                  <span class="badge {% if res.reservation_status == 'confirmed' %}bg-success-subtle text-success border border-success-subtle{% elif res.reservation_status == 'seated' %}bg-primary-subtle text-primary border border-primary-subtle{% elif res.reservation_status == 'pending' %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-secondary-subtle text-secondary{% endif %} text-capitalize px-2 py-1">
+                    {{ res.reservation_status }}
+                  </span>
+                </td>
+                <td class="small text-muted">{{ res.special_requests or '-' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Operational Dashboard{% endblock %}
+
+{% block content %}
+<!-- Metric Cards Row -->
+<div class="row g-4 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="metric-card p-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="text-secondary small fw-semibold text-uppercase">Menu Catalog</span>
+        <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-book"></i>
+        </div>
+      </div>
+      <h2 class="fw-bold mb-1">{{ stats.total_menu_items }}</h2>
+      <div class="text-muted small">
+        Across <span class="fw-semibold text-dark">{{ stats.total_categories }}</span> active categories
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="metric-card p-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="text-secondary small fw-semibold text-uppercase">Available Tables</span>
+        <div class="metric-icon bg-success bg-opacity-10 text-success">
+          <i class="bi bi-grid-3x3-gap"></i>
+        </div>
+      </div>
+      <h2 class="fw-bold mb-1">{{ stats.available_tables }} <span class="fs-6 fw-normal text-muted">/ {{ stats.total_tables }}</span></h2>
+      <div class="text-muted small">
+        <span class="text-success fw-semibold"><i class="bi bi-check-circle"></i> Ready</span> for walk-ins
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="metric-card p-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="text-secondary small fw-semibold text-uppercase">Today's Bookings</span>
+        <div class="metric-icon bg-info bg-opacity-10 text-info">
+          <i class="bi bi-calendar-check"></i>
+        </div>
+      </div>
+      <h2 class="fw-bold mb-1">{{ stats.today_reservations }}</h2>
+      <div class="text-muted small">
+        Confirmed customer reservations
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="metric-card p-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="text-secondary small fw-semibold text-uppercase">Low Stock Alert</span>
+        <div class="metric-icon {% if stats.low_stock_count > 0 %}bg-warning bg-opacity-10 text-warning{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %}">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+      </div>
+      <h2 class="fw-bold mb-1 text-{% if stats.low_stock_count > 0 %}warning{% else %}dark{% endif %}">{{ stats.low_stock_count }}</h2>
+      <div class="text-muted small">
+        {% if stats.low_stock_count > 0 %}
+          <span class="text-warning fw-semibold">Action required</span> on raw supplies
+        {% else %}
+          Stock levels optimal
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row g-4">
+  <!-- Floor Layout Overview -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="fw-bold mb-0">Floor Status Overview</h5>
+          <span class="text-muted small">Real-time table occupancy & readiness</span>
+        </div>
+        <a href="{{ url_for('tables.index') }}" class="btn btn-sm btn-outline-primary">View Floor Plan</a>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3">
+          {% for table in tables_overview %}
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="table-card {{ table.table_status }} p-3 text-center">
+                <div class="fw-bold fs-5 text-dark">{{ table.table_number }}</div>
+                <div class="small text-muted">{{ table.location_zone }} &bull; {{ table.capacity }} Seats</div>
+                <span class="badge {% if table.table_status == 'available' %}bg-success{% elif table.table_status == 'occupied' %}bg-danger{% elif table.table_status == 'reserved' %}bg-warning text-dark{% else %}bg-secondary{% endif %} mt-2 text-capitalize">
+                  {{ table.table_status }}
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Reservations -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="fw-bold mb-0">Upcoming Bookings</h5>
+          <span class="text-muted small">Next scheduled reservations</span>
+        </div>
+        <a href="{{ url_for('tables.index') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body p-4">
+        {% if recent_reservations %}
+          <div class="list-group list-group-flush">
+            {% for res in recent_reservations %}
+              <div class="list-group-item px-0 py-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="fw-semibold text-dark">{{ res.customer_name }}</div>
+                  <div class="small text-muted">
+                    <i class="bi bi-clock me-1"></i>{{ res.reservation_time.strftime('%b %d, %H:%M') }} &bull;
+                    <i class="bi bi-people me-1"></i>{{ res.guest_count }} Guests
+                    {% if res.table %}&bull; <span class="badge bg-light text-dark border">{{ res.table.table_number }}</span>{% endif %}
+                  </div>
+                </div>
+                <span class="badge {% if res.reservation_status == 'confirmed' %}bg-success-subtle text-success border border-success-subtle{% elif res.reservation_status == 'seated' %}bg-primary-subtle text-primary border border-primary-subtle{% elif res.reservation_status == 'pending' %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-secondary-subtle text-secondary{% endif %} px-2 py-1 text-capitalize">
+                  {{ res.reservation_status }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-calendar-x fs-1 mb-2 d-block"></i>
+            No upcoming bookings today.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

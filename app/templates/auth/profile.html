@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block page_title %}User Profile{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm rounded-4 p-4">
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold fs-3" style="width: 64px; height: 64px;">
+          {{ user.full_name[:1] }}
+        </div>
+        <div>
+          <h4 class="mb-0 fw-bold">{{ user.full_name }}</h4>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1 rounded-pill">
+            {{ user.role.name }}
+          </span>
+        </div>
+      </div>
+
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between px-0 py-2">
+          <span class="text-secondary">Username:</span>
+          <span class="fw-medium">{{ user.username }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between px-0 py-2">
+          <span class="text-secondary">Email:</span>
+          <span class="fw-medium">{{ user.email }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between px-0 py-2">
+          <span class="text-secondary">Phone:</span>
+          <span class="fw-medium">{{ user.phone or 'Not specified' }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between px-0 py-2">
+          <span class="text-secondary">Account Status:</span>
+          <span class="badge bg-success-subtle text-success">{{ user.status|capitalize }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between px-0 py-2">
+          <span class="text-secondary">Last Login:</span>
+          <span class="fw-medium">{{ user.last_login_at.strftime('%Y-%m-%d %H:%M UTC') if user.last_login_at else 'First Session' }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

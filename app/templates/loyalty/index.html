@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Loyalty & Rewards - GourmetOS{% endblock %}
+{% block page_title %}Customer Loyalty & Rewards Program{% endblock %}
+
+{% block content %}
+<!-- Loyalty Tiers Cards -->
+<div class="row g-3 mb-4">
+  {% for tier in tiers %}
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 border-0 shadow-sm border-top border-4 {% if tier.tier_name == 'Platinum' %}border-dark{% elif tier.tier_name == 'Gold' %}border-warning{% elif tier.tier_name == 'Silver' %}border-secondary{% else %}border-info{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="fw-bold mb-0">{{ tier.tier_name }}</h5>
+          <i class="bi bi-award fs-3 {% if tier.tier_name == 'Gold' %}text-warning{% elif tier.tier_name == 'Platinum' %}text-dark{% else %}text-secondary{% endif %}"></i>
+        </div>
+        <div class="small text-muted mb-2">Spend ${{ "%.0f"|format(tier.min_spend) }}+ to qualify</div>
+        <div class="bg-light p-2 rounded mb-2">
+          <div class="d-flex justify-content-between small">
+            <span>Points Multiplier:</span>
+            <span class="fw-bold text-primary">{{ tier.points_per_dollar }}x pts / $</span>
+          </div>
+          <div class="d-flex justify-content-between small mt-1">
+            <span>Redemption Value:</span>
+            <span class="fw-bold text-success">${{ "%.2f"|format(tier.discount_per_point * 100) }} / 100 pts</span>
+          </div>
+        </div>
+        <p class="small text-muted mb-0">{{ tier.perks_description }}</p>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Rewards Catalog -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-gift text-primary me-2"></i>Active Rewards Catalog</h6>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          {% for r in rewards %}
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <div>
+              <div class="fw-bold">{{ r.title }}</div>
+              <small class="badge bg-light text-dark border">{{ r.reward_type|replace('_', ' ')|capitalize }}</small>
+              <span class="text-success small fw-semibold ms-1">Value: ${{ "%.2f"|format(r.reward_value) }}</span>
+            </div>
+            <div>
+              <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill">{{ r.points_required }} pts</span>
+            </div>
+          </li>
+          {% else %}
+          <li class="list-group-item text-center text-muted py-4">No rewards active.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Loyalty Points Directory -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-bold"><i class="bi bi-people text-primary me-2"></i>Customer Loyalty Accounts</h6>
+        </div>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#redeemModal">
+          <i class="bi bi-gift me-1"></i> Redeem Reward
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Points Balance</th>
+                <th>Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cust in customers %}
+              <tr>
+                <td class="fw-semibold">{{ cust.name }}</td>
+                <td><small class="text-muted">{{ cust.phone }}</small></td>
+                <td>
+                  <span class="badge bg-primary-subtle text-primary border border-primary fs-6 px-3 py-1">
+                    {{ cust.loyalty_points or 0 }} pts
+                  </span>
+                </td>
+                <td>
+                  {% set pts = cust.loyalty_points or 0 %}
+                  {% if pts >= 2500 %}
+                    <span class="badge bg-dark">Platinum</span>
+                  {% elif pts >= 1000 %}
+                    <span class="badge bg-warning text-dark">Gold</span>
+                  {% elif pts >= 500 %}
+                    <span class="badge bg-secondary">Silver</span>
+                  {% else %}
+                    <span class="badge bg-info text-dark">Bronze</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" class="text-center py-4 text-muted">No customers recorded yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Loyalty Activity -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history text-secondary me-2"></i>Points Transaction Ledger</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Points</th>
+            <th>Balance After</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in recent_txs %}
+          <tr>
+            <td><small>{{ tx.created_at.strftime('%b %d, %Y %H:%M') }}</small></td>
+            <td class="fw-semibold">{{ tx.customer.name }}</td>
+            <td>
+              {% if tx.transaction_type == 'earn' %}
+                <span class="badge bg-success">Earned</span>
+              {% elif tx.transaction_type == 'redeem' %}
+                <span class="badge bg-danger">Redeemed</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ tx.transaction_type|capitalize }}</span>
+              {% endif %}
+            </td>
+            <td class="fw-bold {% if tx.points > 0 %}text-success{% else %}text-danger{% endif %}">
+              {% if tx.points > 0 %}+{% endif %}{{ tx.points }}
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ tx.balance_after }} pts</span></td>
+            <td><small class="text-muted">{{ tx.notes or '-' }}</small></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">No transactions recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Redeem Reward Modal -->
+<div class="modal fade" id="redeemModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form action="{{ url_for('loyalty.redeem_reward') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gift text-primary me-2"></i>Redeem Reward for Customer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Customer</label>
+            <select name="customer_id" class="form-select" required>
+              <option value="">-- Select Customer --</option>
+              {% for cust in customers %}
+                <option value="{{ cust.id }}">{{ cust.name }} ({{ cust.loyalty_points or 0 }} pts)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reward Voucher</label>
+            <select name="reward_id" class="form-select" required>
+              <option value="">-- Choose Reward --</option>
+              {% for r in rewards %}
+                <option value="{{ r.id }}">{{ r.title }} ({{ r.points_required }} pts - Value: ${{ r.reward_value }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Process Redemption</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

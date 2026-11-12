@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Point of Sale (POS) Terminal{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Left Side: Menu Item Selection -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-grid me-2 text-primary"></i>Menu Catalog</h5>
+          <div class="w-50">
+            <input type="text" id="menuSearchInput" class="form-control form-control-sm rounded-pill" placeholder="Search dishes by name...">
+          </div>
+        </div>
+
+        <!-- Category Tabs -->
+        <div class="d-flex flex-wrap gap-2 pb-2 border-bottom" id="categoryFilterContainer">
+          <button class="btn btn-sm btn-primary rounded-pill px-3 cat-btn active" data-cat="all">All</button>
+          {% for cat in categories %}
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 cat-btn" data-cat="{{ cat.id }}">{{ cat.name }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-body p-4 overflow-auto" style="max-height: 680px;">
+        <div class="row g-3" id="menuCardsRow">
+          {% for item in menu_items %}
+            <div class="col-sm-6 col-md-4 menu-item-card" data-cat-id="{{ item.category_id }}" data-name="{{ item.name|lower }}">
+              <div class="card h-100 border rounded-3 p-3 shadow-sm hover-shadow d-flex flex-column justify-content-between">
+                <div>
+                  <div class="d-flex justify-content-between align-items-start mb-1">
+                    <span class="badge bg-light text-secondary border small">{{ item.category.name if item.category else '' }}</span>
+                    <span class="fw-bold text-primary fs-6">${{ "%.2f"|format(item.base_price) }}</span>
+                  </div>
+                  <h6 class="fw-bold mb-1 text-dark">{{ item.name }}</h6>
+                  <p class="text-muted small mb-2 text-truncate" title="{{ item.description }}">{{ item.description or '' }}</p>
+                </div>
+
+                <div>
+                  {% if item.variants %}
+                    <div class="mb-2">
+                      <select class="form-select form-select-sm variant-selector" id="variant-select-{{ item.id }}">
+                        <option value="" data-add-price="0">Default (${{ "%.2f"|format(item.base_price) }})</option>
+                        {% for v in item.variants %}
+                          <option value="{{ v.id }}" data-add-price="{{ v.additional_price }}" data-vname="{{ v.name }}">
+                            {{ v.name }} (+${{ "%.2f"|format(v.additional_price) }})
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  {% endif %}
+                  <button type="button" class="btn btn-sm btn-outline-primary w-100 add-to-cart-btn"
+                          data-id="{{ item.id }}"
+                          data-name="{{ item.name }}"
+                          data-price="{{ item.base_price }}">
+                    <i class="bi bi-plus-circle me-1"></i> Add to Order
+                  </button>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Order Cart & Placement -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+        <h5 class="fw-bold mb-3"><i class="bi bi-cart3 text-success me-2"></i>Current Order</h5>
+
+        <!-- Order Setup Options -->
+        <form id="orderForm" method="POST" action="{{ url_for('orders.place') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="items_json" id="itemsJsonInput" value="[]">
+
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Fulfillment Type</label>
+            <select class="form-select form-select-sm" name="order_type_slug" id="orderTypeSelect" required>
+              {% for ot in order_types %}
+                <option value="{{ ot.slug }}" {% if ot.slug == 'dine-in' %}selected{% endif %}>{{ ot.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3" id="tableSelectionGroup">
+            <label class="form-label small fw-semibold text-secondary">Dining Table</label>
+            <select class="form-select form-select-sm" name="table_id" id="tableSelect">
+              <option value="">Select Table...</option>
+              {% for t in tables %}
+                <option value="{{ t.id }}" {% if t.table_status == 'occupied' %}class="text-danger"{% endif %}>
+                  {{ t.table_number }} ({{ t.location_zone }} - {{ t.capacity }} seats) - {{ t.table_status|capitalize }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Customer (Optional)</label>
+            <select class="form-select form-select-sm" name="customer_id">
+              <option value="">Walk-in Customer</option>
+              {% for c in customers %}
+                <option value="{{ c.id }}">{{ c.name }} ({{ c.phone }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Items Cart List -->
+          <div class="border-top pt-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small fw-bold text-uppercase text-secondary">Order Items</span>
+              <span class="badge bg-primary rounded-pill" id="cartCountBadge">0 items</span>
+            </div>
+
+            <div id="cartItemsList" class="overflow-auto pe-1" style="max-height: 240px;">
+              <div class="text-center py-4 text-muted small" id="emptyCartMessage">
+                <i class="bi bi-basket3 fs-2 d-block mb-1"></i>
+                No items added to order yet.
+              </div>
+            </div>
+          </div>
+
+          <!-- Coupon & Notes -->
+          <div class="mb-3">
+            <input type="text" name="coupon_code" class="form-control form-control-sm text-uppercase" placeholder="Promotional Coupon (e.g. WELCOME10)">
+          </div>
+
+          <div class="mb-3">
+            <textarea name="special_notes" class="form-control form-control-sm" rows="2" placeholder="Kitchen special instructions..."></textarea>
+          </div>
+
+          <!-- Running Totals -->
+          <div class="bg-light p-3 rounded-3 mb-3">
+            <div class="d-flex justify-content-between small text-secondary mb-1">
+              <span>Subtotal:</span>
+              <span class="fw-semibold text-dark" id="subtotalDisplay">$0.00</span>
+            </div>
+            <div class="d-flex justify-content-between small text-secondary mb-1">
+              <span>Estimated Tax (8.25%):</span>
+              <span class="fw-semibold text-dark" id="taxDisplay">$0.00</span>
+            </div>
+            <div class="d-flex justify-content-between fw-bold fs-5 text-dark border-top pt-2">
+              <span>Total Due:</span>
+              <span class="text-primary" id="grandTotalDisplay">$0.00</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 py-2 fw-semibold" id="submitOrderBtn" disabled>
+            <i class="bi bi-check2-circle me-1"></i> Place Order & Send to Kitchen
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cart = [];
+
+// Category filter
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('btn-primary', 'active'));
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.add('btn-outline-secondary'));
+    this.classList.remove('btn-outline-secondary');
+    this.classList.add('btn-primary', 'active');
+
+    const cat = this.getAttribute('data-cat');
+    document.querySelectorAll('.menu-item-card').forEach(card => {
+      if (cat === 'all' || card.getAttribute('data-cat-id') === cat) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+});
+
+// Search filter
+document.getElementById('menuSearchInput').addEventListener('input', function() {
+  const query = this.value.toLowerCase().trim();
+  document.querySelectorAll('.menu-item-card').forEach(card => {
+    const name = card.getAttribute('data-name');
+    if (!query || name.includes(query)) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+});
+
+// Add to Cart
+document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const itemId = parseInt(this.getAttribute('data-id'));
+    const itemName = this.getAttribute('data-name');
+    let basePrice = parseFloat(this.getAttribute('data-price'));
+
+    const variantSelect = document.getElementById(`variant-select-${itemId}`);
+    let variantId = null;
+    let variantName = '';
+    if (variantSelect && variantSelect.value) {
+      variantId = parseInt(variantSelect.value);
+      const selectedOpt = variantSelect.options[variantSelect.selectedIndex];
+      const addPrice = parseFloat(selectedOpt.getAttribute('data-add-price') || 0);
+      basePrice += addPrice;
+      variantName = selectedOpt.getAttribute('data-vname') || '';
+    }
+
+    // Check if item already exists in cart with same variant
+    const existingIndex = cart.findIndex(c => c.menu_item_id === itemId && c.variant_id === variantId);
+    if (existingIndex > -1) {
+      cart[existingIndex].quantity += 1;
+    } else {
+      cart.push({
+        menu_item_id: itemId,
+        name: itemName,
+        variant_id: variantId,
+        variant_name: variantName,
+        unit_price: basePrice,
+        quantity: 1,
+        instructions: ''
+      });
+    }
+
+    renderCart();
+  });
+});
+
+function renderCart() {
+  const cartList = document.getElementById('cartItemsList');
+  const emptyMsg = document.getElementById('emptyCartMessage');
+  const submitBtn = document.getElementById('submitOrderBtn');
+  const badge = document.getElementById('cartCountBadge');
+
+  if (cart.length === 0) {
+    cartList.innerHTML = '';
+    cartList.appendChild(emptyMsg);
+    submitBtn.disabled = true;
+    badge.textContent = '0 items';
+    updateTotals(0);
+    document.getElementById('itemsJsonInput').value = '[]';
+    return;
+  }
+
+  cartList.innerHTML = '';
+  let subtotal = 0;
+  let totalItemsCount = 0;
+
+  cart.forEach((item, index) => {
+    const itemTotal = item.unit_price * item.quantity;
+    subtotal += itemTotal;
+    totalItemsCount += item.quantity;
+
+    const div = document.createElement('div');
+    div.className = 'd-flex justify-content-between align-items-center py-2 border-bottom';
+    div.innerHTML = `
+      <div class="overflow-hidden me-2">
+        <div class="fw-semibold text-truncate small">${item.name}</div>
+        <div class="text-muted" style="font-size: 0.75rem;">
+          ${item.variant_name ? `<span class="badge bg-light text-dark border me-1">${item.variant_name}</span>` : ''}
+          $${item.unit_price.toFixed(2)} each
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="btn-group btn-group-sm">
+          <button type="button" class="btn btn-outline-secondary px-2 py-0" onclick="updateQty(${index}, -1)">-</button>
+          <span class="px-2 py-0 small fw-bold d-flex align-items-center">${item.quantity}</span>
+          <button type="button" class="btn btn-outline-secondary px-2 py-0" onclick="updateQty(${index}, 1)">+</button>
+        </div>
+        <span class="small fw-bold text-dark" style="min-width: 48px; text-align: right;">$${itemTotal.toFixed(2)}</span>
+      </div>
+    `;
+    cartList.appendChild(div);
+  });
+
+  badge.textContent = `${totalItemsCount} items`;
+  submitBtn.disabled = false;
+  updateTotals(subtotal);
+
+  // Sync to hidden input
+  document.getElementById('itemsJsonInput').value = JSON.stringify(cart);
+}
+
+window.updateQty = function(index, delta) {
+  if (cart[index]) {
+    cart[index].quantity += delta;
+    if (cart[index].quantity <= 0) {
+      cart.splice(index, 1);
+    }
+    renderCart();
+  }
+};
+
+function updateTotals(subtotal) {
+  const tax = subtotal * 0.0825;
+  const grandTotal = subtotal + tax;
+
+  document.getElementById('subtotalDisplay').textContent = `$${subtotal.toFixed(2)}`;
+  document.getElementById('taxDisplay').textContent = `$${tax.toFixed(2)}`;
+  document.getElementById('grandTotalDisplay').textContent = `$${grandTotal.toFixed(2)}`;
+}
+
+// Toggle table requirement based on fulfillment type
+document.getElementById('orderTypeSelect').addEventListener('change', function() {
+  const tableGroup = document.getElementById('tableSelectionGroup');
+  if (this.value === 'takeaway' || this.value === 'delivery') {
+    tableGroup.style.display = 'none';
+    document.getElementById('tableSelect').required = false;
+  } else {
+    tableGroup.style.display = '';
+  }
+});
+</script>
+{% endblock %}

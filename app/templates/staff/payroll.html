@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Payroll - GourmetOS{% endblock %}
+{% block page_title %}Payroll & Salary Slips{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold"><i class="bi bi-cash-stack text-success me-2"></i>Staff Payroll Slips</h6>
+      <small class="text-muted">Generate monthly payroll records and mark salary disbursements</small>
+    </div>
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#generatePayrollModal">
+      <i class="bi bi-plus-circle me-1"></i> Generate Payroll Slip
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Reference</th>
+            <th>Employee</th>
+            <th>Period</th>
+            <th>Base Salary</th>
+            <th>Bonus</th>
+            <th>Deductions</th>
+            <th>Net Salary</th>
+            <th>Status</th>
+            <th>Paid At</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pay in payrolls %}
+          <tr>
+            <td class="fw-bold font-monospace text-primary">{{ pay.payment_reference or ('PAY-' ~ pay.id) }}</td>
+            <td>
+              <div class="fw-semibold">{{ pay.employee.full_name }}</div>
+              <small class="text-muted">{{ pay.employee.department.name }} - {{ pay.employee.designation }}</small>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ pay.payroll_period_year }}-{{ "%02d"|format(pay.payroll_period_month) }}</span></td>
+            <td>${{ "%.2f"|format(pay.base_salary) }}</td>
+            <td class="text-success">+${{ "%.2f"|format(pay.bonus) }}</td>
+            <td class="text-danger">-${{ "%.2f"|format(pay.deductions) }}</td>
+            <td class="fw-bold fs-6 text-dark">${{ "%.2f"|format(pay.net_salary) }}</td>
+            <td>
+              {% if pay.payment_status == 'paid' %}
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Paid</span>
+              {% else %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i> Unpaid</span>
+              {% endif %}
+            </td>
+            <td>{{ pay.payment_date.strftime('%b %d, %Y %H:%M') if pay.payment_date else '-' }}</td>
+            <td class="text-end">
+              {% if pay.payment_status != 'paid' %}
+              <form action="{{ url_for('staff.pay_payroll', payroll_id=pay.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Disburse ${{ pay.net_salary }} to {{ pay.employee.full_name }}?')">
+                  <i class="bi bi-credit-card me-1"></i> Mark Paid
+                </button>
+              </form>
+              {% else %}
+                <span class="text-success small fw-semibold"><i class="bi bi-shield-check"></i> Settled</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="10" class="text-center py-4 text-muted">No payroll records generated yet. Click "Generate Payroll Slip" above.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Generate Payroll Modal -->
+<div class="modal fade" id="generatePayrollModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form action="{{ url_for('staff.generate_payroll') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cash text-primary me-2"></i>Generate Payroll Slip</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Employee</label>
+            <select name="employee_id" class="form-select" required>
+              <option value="">-- Choose Staff Member --</option>
+              {% for emp in employees %}
+                <option value="{{ emp.id }}">{{ emp.employee_code }} - {{ emp.full_name }} (Base: ${{ emp.base_salary }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Month</label>
+              <select name="month" class="form-select" required>
+                {% for m in range(1, 13) %}
+                  <option value="{{ m }}" {% if m == 11 %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Year</label>
+              <input type="number" name="year" class="form-control" value="2026" required>
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Bonus ($)</label>
+              <input type="number" step="0.01" name="bonus" class="form-control" value="0.00">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Deductions ($)</label>
+              <input type="number" step="0.01" name="deductions" class="form-control" value="0.00">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-check me-1"></i> Generate Slip</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

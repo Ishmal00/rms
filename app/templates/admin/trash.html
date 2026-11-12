@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Trash & Soft-Delete Recovery{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="fw-bold mb-1"><i class="bi bi-trash3 text-danger me-2"></i>Soft-Deleted Records</h5>
+        <p class="text-muted small mb-0">Records hidden by default filters can be reviewed and restored here.</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs border-bottom-0 mt-4" id="trashTabs" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#menuTrash" type="button">
+          Menu Items ({{ menu_items|length }})
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tablesTrash" type="button">
+          Tables ({{ tables|length }})
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#inventoryTrash" type="button">
+          Inventory ({{ inventory_items|length }})
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#categoriesTrash" type="button">
+          Categories ({{ categories|length }})
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card-body p-4">
+    <div class="tab-content" id="trashTabsContent">
+      <!-- Menu Items Tab -->
+      <div class="tab-pane fade show active" id="menuTrash">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Item Name</th>
+                <th>Category</th>
+                <th>Deleted At</th>
+                <th>Deleted By</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in menu_items %}
+                <tr>
+                  <td>#{{ item.id }}</td>
+                  <td class="fw-semibold">{{ item.name }}</td>
+                  <td>{{ item.category.name if item.category else '-' }}</td>
+                  <td class="small text-muted">{{ item.deleted_at.strftime('%Y-%m-%d %H:%M') if item.deleted_at else '-' }}</td>
+                  <td>{{ item.deleted_by or 'System' }}</td>
+                  <td class="text-end">
+                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='menu_item', item_id=item.id) }}" class="d-inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="6" class="text-center py-4 text-muted">Trash is empty. No deleted menu items.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tables Tab -->
+      <div class="tab-pane fade" id="tablesTrash">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Table Number</th>
+                <th>Zone</th>
+                <th>Deleted At</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tbl in tables %}
+                <tr>
+                  <td>#{{ tbl.id }}</td>
+                  <td class="fw-semibold">{{ tbl.table_number }}</td>
+                  <td>{{ tbl.location_zone }}</td>
+                  <td class="small text-muted">{{ tbl.deleted_at.strftime('%Y-%m-%d %H:%M') if tbl.deleted_at else '-' }}</td>
+                  <td class="text-end">
+                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='table', item_id=tbl.id) }}" class="d-inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted tables.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inventory Tab -->
+      <div class="tab-pane fade" id="inventoryTrash">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>SKU</th>
+                <th>Item Name</th>
+                <th>Deleted At</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in inventory_items %}
+                <tr>
+                  <td>#{{ inv.id }}</td>
+                  <td><code>{{ inv.sku }}</code></td>
+                  <td class="fw-semibold">{{ inv.name }}</td>
+                  <td class="small text-muted">{{ inv.deleted_at.strftime('%Y-%m-%d %H:%M') if inv.deleted_at else '-' }}</td>
+                  <td class="text-end">
+                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='inventory_item', item_id=inv.id) }}" class="d-inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted inventory items.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Categories Tab -->
+      <div class="tab-pane fade" id="categoriesTrash">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Category Name</th>
+                <th>Slug</th>
+                <th>Deleted At</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cat in categories %}
+                <tr>
+                  <td>#{{ cat.id }}</td>
+                  <td class="fw-semibold">{{ cat.name }}</td>
+                  <td><code>{{ cat.slug }}</code></td>
+                  <td class="small text-muted">{{ cat.deleted_at.strftime('%Y-%m-%d %H:%M') if cat.deleted_at else '-' }}</td>
+                  <td class="text-end">
+                    <form method="POST" action="{{ url_for('admin.restore_item', entity_type='category', item_id=cat.id) }}" class="d-inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">Trash is empty. No deleted categories.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

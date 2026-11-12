@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Reviews - GourmetOS{% endblock %}
+{% block page_title %}Customer Feedback & Quality Reviews{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white border-0 shadow-sm text-center">
+      <div class="card-body">
+        <div class="small text-white-50 text-uppercase fw-semibold">Overall Rating</div>
+        <h2 class="fw-bold mb-0 mt-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ stats.avg_overall }}</h2>
+        <small class="text-white-50">Based on {{ stats.total_reviews }} reviews</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-light border-0 shadow-sm text-center">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold">Food Quality</div>
+        <h3 class="fw-bold text-success mb-0 mt-1">{{ stats.avg_food }} <small class="text-muted fs-6">/ 5</small></h3>
+        <small class="text-muted">Taste & Presentation</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-light border-0 shadow-sm text-center">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold">Service</div>
+        <h3 class="fw-bold text-info mb-0 mt-1">{{ stats.avg_service }} <small class="text-muted fs-6">/ 5</small></h3>
+        <small class="text-muted">Staff attentiveness</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-light border-0 shadow-sm text-center">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold">Ambience</div>
+        <h3 class="fw-bold text-warning mb-0 mt-1">{{ stats.avg_ambience }} <small class="text-muted fs-6">/ 5</small></h3>
+        <small class="text-muted">Atmosphere & Hygiene</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reviews List -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold"><i class="bi bi-chat-square-quote text-primary me-2"></i>Customer Review Wall</h6>
+      <small class="text-muted">Direct guest feedback and operational responses</small>
+    </div>
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newFeedbackModal">
+      <i class="bi bi-pencil-square me-1"></i> Submit Customer Review
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="list-group list-group-flush">
+      {% for fb in feedbacks %}
+      <div class="list-group-item p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <span class="fw-bold fs-6">{{ fb.customer.name if fb.customer else 'Guest Customer' }}</span>
+            {% if fb.order %}
+              <span class="badge bg-light text-dark border ms-2">Order #{{ fb.order.order_number }}</span>
+            {% endif %}
+            <div class="text-warning mt-1">
+              {% for i in range(fb.food_rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+              {% for i in range(5 - fb.food_rating) %}<i class="bi bi-star text-secondary"></i>{% endfor %}
+              <span class="text-dark fw-bold ms-1">({{ fb.overall_rating }}/5.00)</span>
+            </div>
+          </div>
+          <small class="text-muted">{{ fb.created_at.strftime('%b %d, %Y') }}</small>
+        </div>
+
+        <div class="row g-2 mb-2 text-muted small">
+          <div class="col-auto">Food: <strong>{{ fb.food_rating }}/5</strong></div>
+          <div class="col-auto">&bull; Service: <strong>{{ fb.service_rating }}/5</strong></div>
+          <div class="col-auto">&bull; Ambience: <strong>{{ fb.ambience_rating }}/5</strong></div>
+        </div>
+
+        {% if fb.comments %}
+          <p class="mb-2 text-secondary">{{ fb.comments }}</p>
+        {% endif %}
+
+        {% if fb.response_notes %}
+          <div class="bg-light p-3 rounded border-start border-3 border-primary mt-2">
+            <small class="fw-bold text-primary d-block mb-1"><i class="bi bi-reply-fill me-1"></i>Management Response:</small>
+            <small class="text-dark">{{ fb.response_notes }}</small>
+          </div>
+        {% else %}
+          <!-- Quick Respond Form -->
+          <div class="mt-2">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#replyBox{{ fb.id }}">
+              <i class="bi bi-reply me-1"></i> Respond as Manager
+            </button>
+            <div class="collapse mt-2" id="replyBox{{ fb.id }}">
+              <form action="{{ url_for('feedback.respond_feedback', feedback_id=fb.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group input-group-sm">
+                  <input type="text" name="response_notes" class="form-control" placeholder="Write acknowledgment or resolution..." required>
+                  <button type="submit" class="btn btn-primary">Save Response</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">No reviews recorded yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- New Feedback Modal -->
+<div class="modal fade" id="newFeedbackModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form action="{{ url_for('feedback.create_feedback') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-chat-heart text-primary me-2"></i>Record Guest Feedback</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Customer</label>
+              <select name="customer_id" class="form-select">
+                <option value="">Guest (Anonymous)</option>
+                {% for c in customers %}
+                  <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Order (Optional)</label>
+              <select name="order_id" class="form-select">
+                <option value="">-- None --</option>
+                {% for o in recent_orders %}
+                  <option value="{{ o.id }}">{{ o.order_number }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label fw-semibold">Food Rating</label>
+              <select name="food_rating" class="form-select" required>
+                {% for r in range(5, 0, -1) %}<option value="{{ r }}">{{ r }} Stars</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Service</label>
+              <select name="service_rating" class="form-select" required>
+                {% for r in range(5, 0, -1) %}<option value="{{ r }}">{{ r }} Stars</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Ambience</label>
+              <select name="ambience_rating" class="form-select" required>
+                {% for r in range(5, 0, -1) %}<option value="{{ r }}">{{ r }} Stars</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Guest Review / Comments</label>
+            <textarea name="comments" class="form-control" rows="3" placeholder="Guest remarks..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save Review</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

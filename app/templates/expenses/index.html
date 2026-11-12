@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses - GourmetOS{% endblock %}
+{% block page_title %}Operating Expenses &amp; Cost Accounting{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card bg-danger text-white border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50 text-uppercase fw-semibold">Total Expenses</div>
+            <h3 class="fw-bold mb-0">${{ "%.2f"|format(total_expenses) }}</h3>
+          </div>
+          <i class="bi bi-wallet2 fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card bg-primary text-white border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50 text-uppercase fw-semibold">Total Records</div>
+            <h3 class="fw-bold mb-0" id="expenseRecordCount">-</h3>
+          </div>
+          <i class="bi bi-file-earmark-spreadsheet fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card bg-dark text-white border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50 text-uppercase fw-semibold">Categories Tracked</div>
+            <h3 class="fw-bold mb-0">{{ categories|length }}</h3>
+          </div>
+          <i class="bi bi-tags fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Category Breakdown Cards -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white py-3">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-primary me-2"></i>Expenses by Category</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-2">
+      {% for cat in category_summary %}
+      <div class="col-md-4 col-lg-2">
+        <div class="border rounded p-3 text-center bg-light">
+          <small class="text-muted d-block text-truncate fw-semibold">{{ cat.category }}</small>
+          <div class="fs-5 fw-bold text-dark mt-1">${{ "%.2f"|format(cat.total) }}</div>
+          <small class="badge bg-secondary-subtle text-secondary">{{ cat.count }} items</small>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Expenses Ledger Table (server-side DataTables) -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold"><i class="bi bi-receipt-cutoff text-primary me-2"></i>Expense Records</h6>
+      <small class="text-muted">Itemized operating expenditures</small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <!-- Category filter dropdown -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          Category: <span id="expCatLabel">All</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item exp-cat-item" href="#" data-cat="">All Categories</a></li>
+          {% for c in categories %}
+            <li><a class="dropdown-item exp-cat-item" href="#" data-cat="{{ c.id }}">{{ c.name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#recordExpenseModal">
+        <i class="bi bi-plus-circle me-1"></i> Record New Expense
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="expensesTable" class="table table-hover align-middle mb-0 w-100">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Title / Notes</th>
+            <th>Category</th>
+            <th>Payment Method</th>
+            <th>Receipt Ref</th>
+            <th>Approved By</th>
+            <th class="text-end">Amount</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Record Expense Modal -->
+<div class="modal fade" id="recordExpenseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form action="{{ url_for('expenses.create_expense') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle text-danger me-2"></i>Record Operational Expense</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Expense Title / Description</label>
+            <input type="text" name="title" class="form-control" placeholder="e.g. Monthly Electricity Bill" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Category</label>
+              <select name="category_id" class="form-select" required>
+                {% for c in categories %}
+                  <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Amount ($)</label>
+              <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required>
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Expense Date</label>
+              <input type="date" name="expense_date" class="form-control" value="{{ today.isoformat() }}" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Payment Method</label>
+              <select name="payment_method_id" class="form-select">
+                <option value="">-- Choose Mode --</option>
+                {% for pm in payment_methods %}
+                  <option value="{{ pm.id }}">{{ pm.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Receipt / Invoice Ref #</label>
+            <input type="text" name="receipt_reference" class="form-control" placeholder="INV-2026-XXXX">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Optional notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-check-circle me-1"></i> Save Expense</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var currentCat = '';
+
+  var table = $('#expensesTable').DataTable({
+    processing: true,
+    serverSide: true,
+    pageLength: 25,
+    lengthMenu: [10, 25, 50, 100],
+    order: [[0, 'desc']],
+    ajax: {
+      url:  "{{ url_for('expenses.expenses_api') }}",
+      type: 'GET',
+      data: function (d) {
+        d.category_id = currentCat;
+      },
+      error: function (xhr, error, thrown) {
+        console.error('DataTables AJAX error:', error, thrown);
+      }
+    },
+    columns: [
+      { data: 'expense_date', className: 'small text-muted' },
+      { data: 'title',
+        render: function (v, t, row) {
+          var notes = row.notes ? '<br><small class="text-muted">' + row.notes + '</small>' : '';
+          return '<div class="fw-semibold">' + v + '</div>' + notes;
+        }
+      },
+      { data: 'category',  render: function (v) { return '<span class="badge bg-light text-dark border">' + v + '</span>'; } },
+      { data: 'payment_method', className: 'small' },
+      { data: 'receipt_reference', render: function (v) { return '<code class="text-secondary">' + (v || '-') + '</code>'; } },
+      { data: 'approved_by', className: 'small text-muted' },
+      { data: 'amount', className: 'text-end fw-bold text-danger fs-6' }
+    ],
+    language: {
+      emptyTable:  '<div class="text-center py-4 text-muted">No expense records found.</div>',
+      processing:  '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading…</span></div>',
+      zeroRecords: '<div class="text-center py-4 text-muted">No expense records match your search.</div>'
+    },
+    dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+    drawCallback: function (settings) {
+      /* Update the summary card with the total filtered count */
+      var info = this.api().page.info();
+      $('#expenseRecordCount').text(info.recordsTotal);
+    }
+  });
+
+  /* Category filter */
+  $('.exp-cat-item').on('click', function (e) {
+    e.preventDefault();
+    currentCat = $(this).data('cat');
+    $('#expCatLabel').text($(this).text());
+    table.ajax.reload();
+  });
+
+  /* Reload table after modal form submission to reflect new record */
+  $('#recordExpenseModal').on('hidden.bs.modal', function () {
+    table.ajax.reload(null, false);
+  });
+})();
+</script>
+{% endblock %}

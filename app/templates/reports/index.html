@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Reports - GourmetOS{% endblock %}
+{% block page_title %}Executive Analytics & Financial Performance{% endblock %}
+
+{% block content %}
+<!-- Top Controls -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 class="fw-bold mb-0">Financial & Operational Overview</h5>
+    <small class="text-muted">High-performance metrics cached via Redis with auto-invalidation</small>
+  </div>
+  <a href="{{ url_for('reports.index', refresh=1) }}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-arrow-clockwise me-1"></i> Refresh Cache
+  </a>
+</div>
+
+<!-- Primary Financial KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4 col-lg-2">
+    <div class="card bg-success text-white border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-white-50 text-uppercase fw-semibold">Total Revenue</div>
+        <h4 class="fw-bold mb-0 mt-1">${{ "%.2f"|format(kpis.total_revenue) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-lg-2">
+    <div class="card bg-danger text-white border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-white-50 text-uppercase fw-semibold">Total Expenses</div>
+        <h4 class="fw-bold mb-0 mt-1">${{ "%.2f"|format(kpis.total_expenses) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-lg-2">
+    <div class="card {% if kpis.net_profit >= 0 %}bg-primary{% else %}bg-dark{% endif %} text-white border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-white-50 text-uppercase fw-semibold">Net Profit</div>
+        <h4 class="fw-bold mb-0 mt-1">${{ "%.2f"|format(kpis.net_profit) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-lg-2">
+    <div class="card bg-info text-white border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-white-50 text-uppercase fw-semibold">Profit Margin</div>
+        <h4 class="fw-bold mb-0 mt-1">{{ "%.1f"|format(kpis.margin_percent) }}%</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-lg-2">
+    <div class="card bg-secondary text-white border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-white-50 text-uppercase fw-semibold">Total Orders</div>
+        <h4 class="fw-bold mb-0 mt-1">{{ kpis.total_orders }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-lg-2">
+    <div class="card bg-warning text-dark border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="small text-muted text-uppercase fw-semibold">Avg Ticket</div>
+        <h4 class="fw-bold mb-0 mt-1">${{ "%.2f"|format(kpis.avg_ticket) }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Top Selling Items -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-trophy text-warning me-2"></i>Top Selling Menu Items</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Rank</th>
+                <th>Dish Name</th>
+                <th>Quantity Sold</th>
+                <th class="text-end">Total Gross Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in top_items %}
+              <tr>
+                <td>
+                  <span class="badge rounded-circle {% if loop.index == 1 %}bg-warning text-dark{% elif loop.index == 2 %}bg-secondary text-white{% elif loop.index == 3 %}bg-bronze text-white{% else %}bg-light text-dark border{% endif %}" style="width: 26px; height: 26px; line-height: 18px;">
+                    {{ loop.index }}
+                  </span>
+                </td>
+                <td class="fw-semibold">{{ item.name }}</td>
+                <td><span class="badge bg-primary-subtle text-primary border border-primary px-3 py-1">{{ item.qty_sold }} orders</span></td>
+                <td class="text-end fw-bold text-success fs-6">${{ "%.2f"|format(item.total_sales) }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" class="text-center py-4 text-muted">No sales data available yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders Breakdown by Channel -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Sales Volume by Channel</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Order Channel</th>
+                <th>Orders</th>
+                <th class="text-end">Gross Sales</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in order_types_summary %}
+              <tr>
+                <td class="fw-semibold">{{ row.order_type }}</td>
+                <td><span class="badge bg-light text-dark border">{{ row.count }} orders</span></td>
+                <td class="text-end fw-bold text-dark">${{ "%.2f"|format(row.total) }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-center py-4 text-muted">No orders data available.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

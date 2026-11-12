@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Orders Management{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <!-- Filter bar -->
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a href="{{ url_for('orders.pos') }}" class="btn btn-sm btn-primary rounded-pill px-3">
+          <i class="bi bi-plus-circle me-1"></i> New Order (POS)
+        </a>
+
+        <!-- Status Filter Buttons -->
+        <div class="btn-group btn-group-sm" id="statusFilters">
+          <button type="button" class="btn btn-dark status-btn active" data-status="">All</button>
+          <button type="button" class="btn btn-outline-warning text-dark status-btn" data-status="pending">Pending</button>
+          <button type="button" class="btn btn-outline-info text-dark status-btn" data-status="preparing">Preparing</button>
+          <button type="button" class="btn btn-outline-primary status-btn" data-status="ready">Ready</button>
+          <button type="button" class="btn btn-outline-success status-btn" data-status="completed">Completed</button>
+          <button type="button" class="btn btn-outline-danger status-btn" data-status="cancelled">Cancelled</button>
+        </div>
+      </div>
+
+      <!-- Type Filter -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          Fulfillment: <span id="typeLabel">All Types</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item type-item" href="#" data-type="">All Types</a></li>
+          {% for ot in order_types %}
+            <li><a class="dropdown-item type-item" href="#" data-type="{{ ot.slug }}">{{ ot.name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Orders Table (server-side DataTables) -->
+    <div class="table-responsive">
+      <table id="ordersTable" class="table table-hover align-middle w-100">
+        <thead class="table-light">
+          <tr>
+            <th>Order #</th>
+            <th>Type / Table</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Total Amount</th>
+            <th>Time</th>
+            <th class="text-end no-sort">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var currentStatus = '';
+  var currentType   = '';
+
+  /* ── Status badge helper ── */
+  function statusBadge(s) {
+    var map = {
+      completed: 'bg-success-subtle text-success border border-success-subtle',
+      preparing: 'bg-info-subtle text-info border border-info-subtle',
+      ready:     'bg-primary-subtle text-primary border border-primary-subtle',
+      cancelled: 'bg-danger-subtle text-danger border border-danger-subtle',
+      pending:   'bg-warning-subtle text-warning border border-warning-subtle'
+    };
+    var cls = map[s] || 'bg-secondary-subtle text-secondary border';
+    return '<span class="badge ' + cls + ' px-2 py-1 text-capitalize">' + s + '</span>';
+  }
+
+  /* ── DataTable init ── */
+  var table = $('#ordersTable').DataTable({
+    processing:  true,
+    serverSide:  true,
+    pageLength:  25,
+    lengthMenu:  [10, 25, 50, 100],
+    order:       [[5, 'desc']],
+    ajax: {
+      url:  "{{ url_for('orders.orders_api') }}",
+      type: 'GET',
+      data: function (d) {
+        d.status = currentStatus;
+        d.type   = currentType;
+      },
+      error: function (xhr, error, thrown) {
+        console.error('DataTables AJAX error:', error, thrown);
+      }
+    },
+    columns: [
+      { data: 'order_number',
+        render: function (v) {
+          return '<span class="fw-bold text-dark">' + v + '</span>';
+        }
+      },
+      { data: 'type',
+        render: function (v, t, row) {
+          var tbl = row.table ? '<div class="small fw-semibold text-primary mt-1"><i class="bi bi-grid-3x3-gap"></i> ' + row.table + '</div>' : '';
+          return '<span class="badge bg-light text-dark border">' + v + '</span>' + tbl;
+        }
+      },
+      { data: 'customer' },
+      { data: 'status', render: statusBadge },
+      { data: 'total_amount', className: 'fw-bold text-dark' },
+      { data: 'created_at', className: 'small text-muted' },
+      {
+        data:      null,
+        orderable: false,
+        className: 'text-end',
+        render: function (v, t, row) {
+          var btns = '';
+          if (row.invoice_id) {
+            btns += '<a href="/billing/invoices/' + row.invoice_id + '" class="btn btn-sm btn-outline-primary" title="View Invoice"><i class="bi bi-credit-card"></i></a> ';
+            btns += '<a href="/billing/invoices/' + row.invoice_id + '/print" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Receipt"><i class="bi bi-printer"></i></a> ';
+          }
+          if (!['completed', 'cancelled'].includes(row.status)) {
+            btns += '<form method="POST" action="/orders/' + row.id + '/cancel" class="d-inline"' +
+                    ' onsubmit="return confirm(\'Cancel this order? Inventory and table occupancy will be restored atomically.\')">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Order"><i class="bi bi-x-circle"></i></button>' +
+                    '</form>';
+          }
+          return '<div class="btn-group btn-group-sm">' + btns + '</div>';
+        }
+      }
+    ],
+    language: {
+      emptyTable:  '<div class="text-center py-4 text-muted"><i class="bi bi-receipt fs-2 d-block mb-1"></i>No orders match your filter criteria.</div>',
+      processing:  '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading…</span></div>',
+      zeroRecords: '<div class="text-center py-4 text-muted"><i class="bi bi-receipt fs-2 d-block mb-1"></i>No orders match your search.</div>'
+    },
+    columnDefs: [{ orderable: false, targets: 'no-sort' }],
+    dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
+  });
+
+  /* ── Status filter ── */
+  $('#statusFilters').on('click', '.status-btn', function () {
+    currentStatus = $(this).data('status');
+    // Update active button styling
+    $(this).closest('.btn-group').find('.btn').each(function () {
+      var $b = $(this);
+      var base = $b.data('status');
+      $b.removeClass('btn-dark btn-warning btn-info btn-primary btn-success btn-danger active');
+      var outlineCls = {
+        '':          'btn-dark',
+        'pending':   'btn-outline-warning text-dark',
+        'preparing': 'btn-outline-info text-dark',
+        'ready':     'btn-outline-primary',
+        'completed': 'btn-outline-success',
+        'cancelled': 'btn-outline-danger'
+      }[base] || 'btn-outline-secondary';
+      $b.addClass(outlineCls);
+    });
+    // Set active state on clicked button
+    $(this).removeClass('btn-outline-warning btn-outline-info btn-outline-primary btn-outline-success btn-outline-danger btn-outline-secondary')
+           .addClass('btn-dark active');
+    table.ajax.reload();
+  });
+
+  /* ── Type filter ── */
+  $('.type-item').on('click', function (e) {
+    e.preventDefault();
+    currentType = $(this).data('type');
+    $('#typeLabel').text($(this).text());
+    table.ajax.reload();
+  });
+})();
+</script>
+{% endblock %}

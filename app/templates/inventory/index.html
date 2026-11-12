@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Inventory &amp; Supplies{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <!-- Filter bar (kept for UX context; DataTables search field also works) -->
+    <div class="row g-3 align-items-center justify-content-between mb-4">
+      <div class="col-md-7 d-flex flex-wrap gap-2 justify-content-md-end align-items-center">
+        <div class="form-check form-switch ms-1 mb-0">
+          <input class="form-check-input" type="checkbox" id="lowStockToggle">
+          <label class="form-check-label text-warning fw-semibold small" for="lowStockToggle">
+            <i class="bi bi-exclamation-triangle me-1"></i>Low Stock Only
+          </label>
+        </div>
+
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            Category: <span id="catLabel">All Categories</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item cat-item" href="#" data-cat="">All</a></li>
+            {% for cat in categories %}
+              <li><a class="dropdown-item cat-item" href="#" data-cat="{{ cat }}">{{ cat }}</a></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Table (server-side DataTables) -->
+    <div class="table-responsive">
+      <table id="inventoryTable" class="table table-hover align-middle w-100">
+        <thead class="table-light">
+          <tr>
+            <th>SKU</th>
+            <th>Item Name</th>
+            <th>Category</th>
+            <th>Supplier</th>
+            <th>Current Stock</th>
+            <th>Min Threshold</th>
+            <th>Reorder Qty</th>
+            <th>Unit Cost</th>
+            <th>Stock Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var currentCat      = '';
+  var currentLowStock = false;
+
+  var table = $('#inventoryTable').DataTable({
+    processing: true,
+    serverSide: true,
+    pageLength: 25,
+    lengthMenu: [10, 25, 50, 100],
+    ajax: {
+      url:  "{{ url_for('inventory.inventory_api') }}",
+      type: 'GET',
+      data: function (d) {
+        d.category  = currentCat;
+        d.low_stock = currentLowStock ? '1' : '';
+      },
+      error: function (xhr, error, thrown) {
+        console.error('DataTables AJAX error:', error, thrown);
+      }
+    },
+    columns: [
+      { data: 'sku',      render: function (v) { return '<code>' + v + '</code>'; } },
+      { data: 'name',     className: 'fw-semibold text-dark' },
+      { data: 'category', render: function (v) { return '<span class="badge bg-light text-secondary border">' + v + '</span>'; } },
+      { data: 'supplier', className: 'small' },
+      { data: 'current_stock', className: 'fw-bold' },
+      { data: 'minimum_stock', className: 'text-muted small' },
+      { data: 'reorder_quantity', className: 'text-muted small' },
+      { data: 'unit_cost' },
+      { data: 'is_low_stock',
+        render: function (v) {
+          return v
+            ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="bi bi-arrow-down-circle me-1"></i>Low Stock</span>'
+            : '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check-circle me-1"></i>Adequate</span>';
+        }
+      }
+    ],
+    language: {
+      emptyTable:  '<div class="text-center py-4 text-muted">No inventory items match your filter criteria.</div>',
+      processing:  '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading…</span></div>',
+      zeroRecords: '<div class="text-center py-4 text-muted">No inventory items match your search.</div>'
+    },
+    dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
+  });
+
+  /* Category filter */
+  $('.cat-item').on('click', function (e) {
+    e.preventDefault();
+    currentCat = $(this).data('cat');
+    $('#catLabel').text($(this).text());
+    table.ajax.reload();
+  });
+
+  /* Low stock toggle */
+  $('#lowStockToggle').on('change', function () {
+    currentLowStock = this.checked;
+    table.ajax.reload();
+  });
+})();
+</script>
+{% endblock %}
