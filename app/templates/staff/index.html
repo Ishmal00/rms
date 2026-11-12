@@ -135,8 +135,9 @@
 
 <!-- Employee Directory -->
 <div class="card border-0 shadow-sm">
-  <div class="card-header bg-white py-3">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
     <h6 class="mb-0 fw-bold"><i class="bi bi-people text-primary me-2"></i>Staff Directory</h6>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('staff.employee_create') }}"><i class="bi bi-person-plus me-1"></i> Add Employee</a>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -147,9 +148,10 @@
             <th>Name</th>
             <th>Department</th>
             <th>Designation</th>
+            <th>Shift</th>
             <th>Base Salary</th>
             <th>Hire Date</th>
-            <th>Status</th>
+            <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -162,12 +164,19 @@
             </td>
             <td><span class="badge bg-light text-dark border">{{ emp.department.name }}</span></td>
             <td>{{ emp.designation }}</td>
+            <td>{{ emp.shift.name if emp.shift else '-' }}</td>
             <td class="fw-semibold">${{ "%.2f"|format(emp.base_salary) }}</td>
             <td>{{ emp.hire_date.strftime('%b %d, %Y') if emp.hire_date else '-' }}</td>
             <td>
-              <span class="badge bg-success-subtle text-success border border-success">Active</span>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('staff.employee_edit', employee_id=emp.id) }}">Edit</a>
+              <form action="{{ url_for('staff.employee_delete', employee_id=emp.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Move this employee to trash?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
             </td>
           </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No active employees found.</td></tr>
           {% endfor %}
         </tbody>
       </table>

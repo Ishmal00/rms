@@ -69,6 +69,7 @@ def inventory_api():
             'category': i.category,
             'current_stock': float(i.current_stock),
             'minimum_stock': float(i.minimum_stock),
+            'reorder_quantity': float(i.reorder_quantity),
             'unit': i.unit,
             'unit_cost': f"${float(i.unit_cost):.2f}",
             'is_low_stock': i.current_stock <= i.minimum_stock,

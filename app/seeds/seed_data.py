@@ -13,6 +13,7 @@ from app.models.expenses import ExpenseCategory, Expense
 from app.models.loyalty import LoyaltyProgram, LoyaltyTransaction, Reward
 from app.models.feedback import CustomerFeedback
 from app.models.settings import SystemSetting, AuditLog
+from app.models.notifications import Notification
 from app.services.order_service import OrderService
 
 
@@ -58,6 +59,7 @@ def seed_database():
         ('Manage Payroll', 'payroll.manage', 'payroll', 'Generate and disburse payroll'),
         ('View Reports', 'reports.view', 'reports', 'View operational and financial reports'),
         ('Manage Staff', 'staff.manage', 'staff', 'View staff and manage attendance'),
+        ('Manage Customers', 'customers.manage', 'customers', 'Create, update, and remove customer records'),
     ]
 
     perms = {}
@@ -76,7 +78,8 @@ def seed_database():
 
     manager_perms = [
         'menu.view', 'menu.manage', 'inventory.view', 'inventory.manage',
-        'tables.view', 'tables.manage', 'reports.view', 'staff.manage'
+        'tables.view', 'tables.manage', 'reports.view', 'staff.manage',
+        'customers.manage'
     ]
     for pslug in manager_perms:
         if not RolePermission.query.filter_by(role_id=roles['manager'].id, permission_id=perms[pslug].id).first():
@@ -564,6 +567,7 @@ def seed_database():
                 last_name=ln,
                 designation=desig,
                 department_id=depts[dname].id,
+                shift_id=shifts['Evening Shift' if code == 'EMP-002' else 'Morning Shift'].id,
                 base_salary=salary,
                 emergency_contact=phone,
                 hire_date=date.today() - timedelta(days=180),
@@ -571,6 +575,8 @@ def seed_database():
             )
             db.session.add(emp)
             db.session.flush()
+        elif not emp.shift_id:
+            emp.shift_id = shifts['Evening Shift' if code == 'EMP-002' else 'Morning Shift'].id
         employees[code] = emp
 
     # Sample Attendance for today
@@ -737,6 +743,16 @@ def seed_database():
             target_entity='SystemSetting',
             details_json='{"message": "Restaurant Management System initialized with 44 relational models"}',
             ip_address='127.0.0.1',
+            created_by=admin_user_id
+        ))
+
+    if not Notification.query.filter_by(user_id=admin_user_id).first():
+        db.session.add(Notification(
+            user_id=admin_user_id,
+            title='Welcome to notifications',
+            message='New orders, low inventory, and received payments will appear here.',
+            notification_type='system',
+            link='/notifications/',
             created_by=admin_user_id
         ))
 

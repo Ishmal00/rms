@@ -5,6 +5,7 @@ from app.extensions import db
 from app.services.cache_service import cache
 from app.models.billing import Tax, Discount, Coupon, Invoice, InvoiceItem, PaymentMethod, Payment
 from app.models.orders import OrderStatusHistory
+from app.services.notification_service import NotificationService
 
 
 class BillingError(Exception):
@@ -187,6 +188,16 @@ class BillingService:
                 notes=notes
             )
             db.session.add(payment)
+            NotificationService.create_for_all(
+                title='Payment received',
+                message=(
+                    f'Payment of ${pay_amount:.2f} received for '
+                    f'invoice {invoice.invoice_number}.'
+                ),
+                notification_type='payment_received',
+                link=f'/billing/invoices/{invoice.id}',
+                created_by=user_id
+            )
 
             # 3. Update invoice balance
             new_paid = Decimal(str(invoice.paid_amount)) + pay_amount

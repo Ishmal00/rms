@@ -9,6 +9,7 @@ from app.models.menu import MenuItem, ItemVariant
 from app.models.inventory import InventoryItem, StockMovement
 from app.services.billing_service import BillingService
 from app.services.cache_service import cache
+from app.services.notification_service import NotificationService
 
 
 class OrderError(Exception):
@@ -142,7 +143,30 @@ class OrderService:
 
                 if inv_item:
                     deduct_qty = Decimal(str(qty))
-                    inv_item.current_stock = Decimal(str(inv_item.current_stock)) - deduct_qty
+                    available_stock = Decimal(str(inv_item.current_stock))
+                    if available_stock < deduct_qty:
+                        raise OrderPlacementError(
+                            f"Insufficient stock for {inv_item.name}: "
+                            f"requested {deduct_qty} {inv_item.unit}, "
+                            f"available {available_stock} {inv_item.unit}."
+                        )
+
+                    updated_stock = available_stock - deduct_qty
+                    if (
+                        available_stock > Decimal(str(inv_item.minimum_stock))
+                        and updated_stock <= Decimal(str(inv_item.minimum_stock))
+                    ):
+                        NotificationService.create_for_all(
+                            title='Low inventory stock',
+                            message=(
+                                f'{inv_item.name} is at {updated_stock} {inv_item.unit}, '
+                                f'which is at or below its minimum stock level.'
+                            ),
+                            notification_type='low_stock',
+                            link='/inventory/',
+                            created_by=user_id
+                        )
+                    inv_item.current_stock = updated_stock
 
                     movement = StockMovement(
                         inventory_item_id=inv_item.id,
@@ -184,6 +208,14 @@ class OrderService:
                 order,
                 coupon_code=coupon_code,
                 user_id=user_id
+            )
+
+            NotificationService.create_for_all(
+                title='New order placed',
+                message=f'Order {order.order_number} has been placed.',
+                notification_type='new_order',
+                link='/orders/',
+                created_by=user_id
             )
 
             # Forced failure injection for rollback testing

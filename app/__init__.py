@@ -50,6 +50,8 @@ def create_app(config_name=None):
     from app.blueprints.feedback.routes import feedback_bp
     from app.blueprints.reports.routes import reports_bp
     from app.blueprints.settings.routes import settings_bp
+    from app.blueprints.customers import customers_bp
+    from app.blueprints.notifications import notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -67,6 +69,24 @@ def create_app(config_name=None):
     app.register_blueprint(feedback_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(customers_bp)
+    app.register_blueprint(notifications_bp)
+
+    @app.context_processor
+    def inject_user_notifications():
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return {'notifications_unread_count': 0, 'recent_notifications': []}
+
+        from app.models.notifications import Notification
+        notifications = Notification.query.filter_by(user_id=current_user.id)
+        return {
+            'notifications_unread_count': notifications.filter_by(is_read=False).count(),
+            'recent_notifications': notifications.order_by(
+                Notification.created_at.desc(),
+                Notification.id.desc()
+            ).limit(5).all()
+        }
 
     # Error handlers
     @app.errorhandler(403)

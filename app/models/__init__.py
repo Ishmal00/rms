@@ -13,6 +13,7 @@ from app.models.expenses import ExpenseCategory, Expense
 from app.models.loyalty import LoyaltyProgram, LoyaltyTransaction, Reward
 from app.models.feedback import CustomerFeedback
 from app.models.settings import SystemSetting, AuditLog
+from app.models.notifications import Notification
 
 __all__ = [
     # Base
@@ -76,4 +77,6 @@ __all__ = [
     # Settings & Audit (2)
     'SystemSetting',
     'AuditLog',
+    # Notifications
+    'Notification',
 ]

@@ -31,6 +31,12 @@ class Employee(BaseModel):
         nullable=False,
         index=True
     )
+    shift_id = db.Column(
+        db.Integer,
+        db.ForeignKey('shifts.id', name='fk_employees_shift_id', ondelete='SET NULL'),
+        nullable=True,
+        index=True
+    )
     employee_code = db.Column(db.String(50), unique=True, nullable=False, index=True)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
@@ -41,6 +47,7 @@ class Employee(BaseModel):
 
     user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('employee_profile', uselist=False))
     department = db.relationship('Department', back_populates='employees')
+    shift = db.relationship('Shift', back_populates='employees', foreign_keys=[shift_id])
     attendances = db.relationship('Attendance', back_populates='employee', lazy='dynamic', cascade='all, delete-orphan')
     payrolls = db.relationship('Payroll', back_populates='employee', lazy='dynamic', cascade='all, delete-orphan')
 
@@ -62,6 +69,7 @@ class Shift(BaseModel):
     description = db.Column(db.String(255), nullable=True)
 
     attendances = db.relationship('Attendance', back_populates='shift', lazy='dynamic')
+    employees = db.relationship('Employee', back_populates='shift', foreign_keys='Employee.shift_id', lazy='dynamic')
 
     def __repr__(self):
         return f"<Shift {self.name} ({self.start_time}-{self.end_time})>"

@@ -19,6 +19,8 @@ class StaffService:
         employee = Employee.query.get(employee_id)
         if not employee:
             raise StaffServiceError(f"Employee ID {employee_id} not found.")
+        if shift_id is None:
+            shift_id = employee.shift_id
 
         today = date.today()
         # Check if already clocked in today without clocking out

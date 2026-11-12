@@ -151,6 +151,40 @@ def test_02_place_order_forced_failure_rollback(app):
     assert Decimal(str(inv_item.current_stock)) == baseline_stock
 
 
+def test_03_place_order_insufficient_stock_rolls_back(app):
+    admin = User.query.filter_by(username='admin').first()
+    table = RestaurantTable.query.filter_by(table_number='T-03').first()
+    table.table_status = 'available'
+    inv_item = InventoryItem.query.filter_by(name='Ribeye Cut Beef').first()
+    steak = MenuItem.query.filter_by(slug='prime-ribeye-steak').first()
+
+    original_stock = Decimal(str(inv_item.current_stock))
+    inv_item.current_stock = Decimal('0.50')
+    db.session.commit()
+
+    baseline_order_count = Order.query.count()
+    baseline_movement_count = StockMovement.query.count()
+
+    with pytest.raises(OrderPlacementError, match='Insufficient stock for Ribeye Cut Beef') as exc_info:
+        OrderService.place_order(
+            order_type_slug='dine-in',
+            items_data=[{'menu_item_id': steak.id, 'quantity': 1}],
+            table_id=table.id,
+            user_id=admin.id
+        )
+
+    assert 'requested 1 kg, available 0.50 kg' in str(exc_info.value)
+    assert Order.query.count() == baseline_order_count
+    assert StockMovement.query.count() == baseline_movement_count
+    db.session.refresh(table)
+    assert table.table_status == 'available'
+    db.session.refresh(inv_item)
+    assert Decimal(str(inv_item.current_stock)) == Decimal('0.50')
+
+    inv_item.current_stock = original_stock
+    db.session.commit()
+
+
 def test_03_payment_processing_partial_and_full(app):
     """
     Test 3: Process Payment Atomic Transaction
